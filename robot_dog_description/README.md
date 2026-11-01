@@ -52,7 +52,12 @@ robot_dog_description/
 ├── meshes/                           # 連桿座標系、單位公尺的 STL（產生）
 ├── config/  ros2_controllers.yaml, gz_bridge.yaml, rl_defaults.yaml
 ├── launch/  display.launch.py, gazebo.launch.py, isaac.launch.py
-├── isaac/robot_dog_isaac.py          # Isaac Sim 端：匯入、感測器、ROS 2 graph
+├── isaac/
+│   ├── robot_dog_isaac.py            # Isaac Sim 端（ros2_control 模式）：組裝下面的模組
+│   ├── robot_dog_sim/                # 共用模組：robot_spec（常數）、kit、world、robot（URDF 匯入）、
+│   │                                 #   sensors（IMU/相機/RTX LiDAR）、ros_graph（OmniGraph ROS 2）、util、policy_meta
+│   ├── tools/rclpy_probe.py          # 確認 rclpy 能和 OmniGraph ROS 2 橋接在同一程序共存
+│   └── tests/                        # pytest（純 Python 部分，系統 python3 即可）
 ├── worlds/empty.sdf                  # 已載入 Sensors / Imu 系統
 ├── scripts/stand_up.py               # 平滑站立示範
 ├── rviz/robot_dog.rviz
