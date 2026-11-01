@@ -1,0 +1,39 @@
+# Starting values for an RL task (Isaac Lab / legged_gym / MuJoCo).
+# Joint order matches ros2_controllers.yaml, so a trained policy maps 1:1
+# onto joint_group_* controllers on the ROS 2 side.
+urdf: urdf/robot_dog_rl.urdf
+base_link: base_link
+foot_bodies: [FL_calf, FR_calf, RL_calf, RR_calf]   # foot sphere is a collision of the calf
+foot_offset: [0.0, 0.0, -0.16]                       # foot center in calf frame (m)
+nominal_base_height: 0.26                            # standing, feet on the ground (m)
+spawn_height: 0.32
+
+joint_order:
+  - FL_hip_joint
+  - FL_thigh_joint
+  - FL_calf_joint
+  - FR_hip_joint
+  - FR_thigh_joint
+  - FR_calf_joint
+  - RL_hip_joint
+  - RL_thigh_joint
+  - RL_calf_joint
+  - RR_hip_joint
+  - RR_thigh_joint
+  - RR_calf_joint
+
+default_joint_pos:   # standing pose (rad)
+  hip: 0.0
+  thigh: 0.8
+  calf: -1.5
+
+pd_gains:            # tau = kp * (q_target - q) - kd * dq
+  kp: 20.0
+  kd: 0.5
+action_scale: 0.25   # q_target = default_joint_pos + action_scale * action
+
+actuator_limits:     # placeholders, match tools/generate_description.py
+  effort: 25.0       # N*m
+  velocity: 30.0     # rad/s
+
+imu_frame: imu_link  # IMU is rigidly in base_link at [0, 0, 0.048]

@@ -1,0 +1,113 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    Gazebo Harmonic (gz-sim 8) extensions. Sensor frames are massless fixed
+    links, so sdformat merges them into base_link and keeps the sensor pose;
+    gz_frame_id keeps the ROS frame_id equal to the URDF frame name.
+    The world must load the Sensors and Imu systems (see worlds/empty.sdf).
+  -->
+  <xacro:macro name="foot_contact" params="leg">
+    <gazebo reference="${leg}_calf">
+      <mu1>1.0</mu1>
+      <mu2>1.0</mu2>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:macro name="robot_dog_gazebo" params="controllers_file">
+    <gazebo>
+      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>${controllers_file}</parameters>
+      </plugin>
+    </gazebo>
+
+    <xacro:foot_contact leg="FL"/>
+    <xacro:foot_contact leg="FR"/>
+    <xacro:foot_contact leg="RL"/>
+    <xacro:foot_contact leg="RR"/>
+
+    <gazebo reference="imu_link">
+      <sensor name="imu_sensor" type="imu">
+        <always_on>true</always_on>
+        <update_rate>200</update_rate>
+        <topic>imu</topic>
+        <gz_frame_id>imu_link</gz_frame_id>
+        <imu>
+          <angular_velocity>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.002</stddev></noise></z>
+          </angular_velocity>
+          <linear_acceleration>
+            <x><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></x>
+            <y><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></y>
+            <z><noise type="gaussian"><mean>0</mean><stddev>0.02</stddev></noise></z>
+          </linear_acceleration>
+        </imu>
+      </sensor>
+    </gazebo>
+
+    <gazebo reference="laser_link">
+      <!-- 2D 360 deg scan. Raise vertical samples for a 3D LiDAR (points on scan/points). -->
+      <sensor name="laser" type="gpu_lidar">
+        <always_on>true</always_on>
+        <visualize>true</visualize>
+        <update_rate>10</update_rate>
+        <topic>scan</topic>
+        <gz_frame_id>laser_link</gz_frame_id>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>720</samples>
+              <resolution>1</resolution>
+              <min_angle>-3.14159</min_angle>
+              <max_angle>3.14159</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>1</samples>
+              <resolution>1</resolution>
+              <min_angle>0</min_angle>
+              <max_angle>0</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>0.12</min>
+            <max>12.0</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </lidar>
+      </sensor>
+    </gazebo>
+
+    <gazebo reference="camera_link">
+      <sensor name="camera" type="camera">
+        <always_on>true</always_on>
+        <update_rate>30</update_rate>
+        <topic>camera/image_raw</topic>
+        <gz_frame_id>camera_optical_link</gz_frame_id>
+        <camera>
+          <camera_info_topic>camera/camera_info</camera_info_topic>
+          <horizontal_fov>1.204</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.05</near>
+            <far>20.0</far>
+          </clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+</robot>

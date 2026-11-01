@@ -1,0 +1,10 @@
+{
+	"autodeskProduct": "Fusion",
+	"type": "script",
+	"author": "",
+	"description": {
+		"": "Export RobotDog12DOF meshes and mass properties (robot_dog_fusion.json) for the ROS 2 package generator"
+	},
+	"supportedOS": "windows|mac",
+	"editEnabled": true
+}

@@ -1,0 +1,10 @@
+{
+	"autodeskProduct": "Fusion",
+	"type": "script",
+	"author": "",
+	"description": {
+		"": "12-DOF robot dog (base_link + 4x hip/thigh/calf) with IMU, LiDAR and camera, ready for ROS 2 / RL export"
+	},
+	"supportedOS": "windows|mac",
+	"editEnabled": true
+}

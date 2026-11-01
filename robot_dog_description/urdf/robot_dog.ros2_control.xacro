@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- Standing pose, also the initial joint position in simulation. -->
+  <xacro:property name="stand_hip" value="0.0"/>
+  <xacro:property name="stand_thigh" value="0.8"/>
+  <xacro:property name="stand_calf" value="-1.5"/>
+  <xacro:property name="max_effort" value="25.0"/>
+
+  <xacro:macro name="dog_joint" params="name initial mode isaac_command">
+    <joint name="${name}">
+      <xacro:if value="${mode == 'isaac'}">
+        <!-- one command type per joint, so Isaac never gets mixed position/effort targets -->
+        <command_interface name="${isaac_command}"/>
+      </xacro:if>
+      <xacro:unless value="${mode == 'isaac'}">
+        <command_interface name="position"/>
+        <command_interface name="velocity"/>
+        <command_interface name="effort">
+          <param name="min">${-max_effort}</param>
+          <param name="max">${max_effort}</param>
+        </command_interface>
+      </xacro:unless>
+      <state_interface name="position">
+        <param name="initial_value">${initial}</param>
+      </state_interface>
+      <state_interface name="velocity"/>
+      <state_interface name="effort"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:macro name="dog_leg" params="leg mode isaac_command">
+    <xacro:dog_joint name="${leg}_hip_joint" initial="${stand_hip}" mode="${mode}" isaac_command="${isaac_command}"/>
+    <xacro:dog_joint name="${leg}_thigh_joint" initial="${stand_thigh}" mode="${mode}" isaac_command="${isaac_command}"/>
+    <xacro:dog_joint name="${leg}_calf_joint" initial="${stand_calf}" mode="${mode}" isaac_command="${isaac_command}"/>
+  </xacro:macro>
+
+  <!-- mode: none (mock hardware) | gazebo | isaac -->
+  <xacro:macro name="robot_dog_ros2_control" params="mode isaac_command">
+    <ros2_control name="RobotDogSystem" type="system">
+      <hardware>
+        <xacro:if value="${mode == 'gazebo'}">
+          <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+        </xacro:if>
+        <xacro:if value="${mode == 'isaac'}">
+          <!-- Isaac Sim publishes /isaac_joint_states and subscribes /isaac_joint_commands
+               (both sensor_msgs/JointState), see isaac/robot_dog_isaac.py -->
+          <plugin>joint_state_topic_hardware_interface/JointStateTopicSystem</plugin>
+          <param name="joint_commands_topic">/isaac_joint_commands</param>
+          <param name="joint_states_topic">/isaac_joint_states</param>
+          <param name="sum_wrapped_joint_states">true</param>
+          <param name="trigger_joint_command_threshold">-1</param>
+        </xacro:if>
+        <xacro:if value="${mode not in ('gazebo', 'isaac')}">
+          <!-- Replace with your motor driver's hardware interface on the real robot. -->
+          <plugin>mock_components/GenericSystem</plugin>
+        </xacro:if>
+      </hardware>
+      <xacro:dog_leg leg="FL" mode="${mode}" isaac_command="${isaac_command}"/>
+      <xacro:dog_leg leg="FR" mode="${mode}" isaac_command="${isaac_command}"/>
+      <xacro:dog_leg leg="RL" mode="${mode}" isaac_command="${isaac_command}"/>
+      <xacro:dog_leg leg="RR" mode="${mode}" isaac_command="${isaac_command}"/>
+      <!-- In Isaac Sim the IMU is published straight to /imu by the simulator instead. -->
+      <xacro:unless value="${mode == 'isaac'}">
+        <!-- Name must match the Gazebo IMU sensor in robot_dog.gazebo.xacro. -->
+        <sensor name="imu_sensor">
+          <state_interface name="orientation.x"/>
+          <state_interface name="orientation.y"/>
+          <state_interface name="orientation.z"/>
+          <state_interface name="orientation.w"/>
+          <state_interface name="angular_velocity.x"/>
+          <state_interface name="angular_velocity.y"/>
+          <state_interface name="angular_velocity.z"/>
+          <state_interface name="linear_acceleration.x"/>
+          <state_interface name="linear_acceleration.y"/>
+          <state_interface name="linear_acceleration.z"/>
+        </sensor>
+      </xacro:unless>
+    </ros2_control>
+  </xacro:macro>
+</robot>
