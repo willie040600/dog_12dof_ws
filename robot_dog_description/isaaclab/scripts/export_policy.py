@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(DESC, "isaac"))
 
 from isaaclab.app import add_launcher_args, launch_simulation  # noqa: E402
 
-from robot_dog_lab.checkpoints import latest_checkpoint, prepare_out_dir  # noqa: E402
+from robot_dog_lab.checkpoints import check_out_dir, latest_checkpoint, staged_dir  # noqa: E402
 
 parser = argparse.ArgumentParser(description="Export robot_dog policy.pt + policy.json.")
 parser.add_argument("--run_dir", required=True, help="Isaac Lab run folder with model_<N>.pt files.")
@@ -37,7 +37,7 @@ run_name = os.path.basename(run_dir.rstrip("/"))
 checkpoint = args_cli.checkpoint or latest_checkpoint(run_dir)
 out_dir = os.path.abspath(os.path.expanduser(args_cli.out or os.path.join(DESC, "isaac", "policies", run_name)))
 try:
-    prepare_out_dir(out_dir, args_cli.force)  # before Isaac starts, so a refusal is immediate
+    check_out_dir(out_dir, args_cli.force)  # before Isaac starts, so a refusal is immediate
 except FileExistsError as e:
     print("[EXPORT] %s" % e, flush=True)
     raise SystemExit(1)
@@ -137,20 +137,23 @@ def main():
         wrapped = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
         runner = OnPolicyRunner(wrapped, to_dict(agent_cfg), log_dir=None, device=agent_cfg.device)
         runner.load(os.path.join(run_dir, checkpoint))
-        runner.export_policy_to_jit(path=out_dir, filename="policy.pt")
 
-        meta = build_meta(env_cfg, agent_cfg, uenv)
-        obs = wrapped.get_observations()
-        jit = torch.jit.load(os.path.join(out_dir, "policy.pt"), map_location="cpu").eval()
-        with torch.inference_mode():
-            a_jit = jit(obs["policy"].cpu())
-            a_ref = runner.get_inference_policy(device=uenv.device)(obs).cpu()
-        err = float((a_jit - a_ref).abs().max())
-        if err >= 1e-5:
-            print("[EXPORT] TorchScript output differs from the runner policy (max %.2e)" % err, flush=True)
-            raise SystemExit(1)
-        validate_policy_meta(meta, policy_input_dim=int(obs["policy"].shape[1]), policy_output_dim=int(a_jit.shape[1]))
-        save_policy_meta(meta, os.path.join(out_dir, "policy.json"))
+        # everything goes into a staging folder that replaces out_dir only after every check passed
+        with staged_dir(out_dir, args_cli.force) as tmp:
+            runner.export_policy_to_jit(path=tmp, filename="policy.pt")
+            meta = build_meta(env_cfg, agent_cfg, uenv)
+            obs = wrapped.get_observations()
+            jit = torch.jit.load(os.path.join(tmp, "policy.pt"), map_location="cpu").eval()
+            with torch.inference_mode():
+                a_jit = jit(obs["policy"].cpu())
+                a_ref = runner.get_inference_policy(device=uenv.device)(obs).cpu()
+            err = float((a_jit - a_ref).abs().max())
+            if err >= 1e-5:
+                print("[EXPORT] TorchScript output differs from the runner policy (max %.2e)" % err, flush=True)
+                raise SystemExit(1)
+            validate_policy_meta(meta, policy_input_dim=int(obs["policy"].shape[1]),
+                                 policy_output_dim=int(a_jit.shape[1]))
+            save_policy_meta(meta, os.path.join(tmp, "policy.json"))
         print("[EXPORT] wrote %s (%s / %s)" % (out_dir, run_name, checkpoint), flush=True)
         print("[EXPORT] joint order: %s" % meta["joint_names"], flush=True)
         print("[EXPORT] obs dim %d, max |jit - runner| = %.2e" % (obs["policy"].shape[1], err), flush=True)
