@@ -41,6 +41,19 @@ def test_feet_air_time_uses_any_motion_gate():
     assert term.params["sensor_cfg"].body_names == ".*_calf"
 
 
+def test_commands_include_small_single_axis_ones():
+    # (0.1, 0, 0) looked like the 10% standing envs (exact zeros) and v4-v6 stood still for it
+    from robot_dog_lab.tasks.locomotion.velocity.mdp import RobotDogVelocityCommand, RobotDogVelocityCommandCfg
+
+    c = RobotDogFlatEnvCfg().commands.base_velocity
+    assert isinstance(c, RobotDogVelocityCommandCfg)
+    assert c.class_type is RobotDogVelocityCommand
+    assert c.rel_small_envs == pytest.approx(0.25)
+    assert tuple(c.small_lin_range) == (0.05, 0.2)
+    assert tuple(c.small_ang_range) == (0.1, 0.3)
+    assert c.asset_name == "robot" and c.debug_vis is True
+
+
 def test_eval_env_cfg_is_deterministic():
     from robot_dog_lab.eval_env import make_eval_env_cfg
 
@@ -50,6 +63,7 @@ def test_eval_env_cfg_is_deterministic():
     assert cfg.events.reset_base.params["pose_range"] == {}
     assert cfg.events.reset_robot_joints.params["position_range"] == (1.0, 1.0)
     assert cfg.commands.base_velocity.rel_standing_envs == 0.0
+    assert cfg.commands.base_velocity.rel_small_envs == 0.0
     assert cfg.observations.policy.enable_corruption is False
 
 

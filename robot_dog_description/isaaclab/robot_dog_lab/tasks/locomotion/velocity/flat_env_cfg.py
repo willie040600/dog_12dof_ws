@@ -1,12 +1,14 @@
 """Flat-ground velocity tracking for robot_dog, based on Isaac Lab's shared velocity task."""
 
+import dataclasses
+
 from isaaclab.utils import configclass, replace
 
 from isaaclab_tasks.core.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
 
 from robot_dog_lab.assets.robot_dog import ROBOT_DOG_CFG
 
-from .mdp import feet_air_time_any_motion
+from .mdp import RobotDogVelocityCommandCfg, feet_air_time_any_motion
 
 
 @configclass
@@ -31,7 +33,14 @@ class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         # actions: q_target = default stand pose + 0.25 * action (config/rl_defaults.yaml)
         self.actions.joint_pos.scale = 0.25
 
-        # commands: a 0.26 m tall, 8.8 kg dog
+        # commands: Isaac Lab's uniform sampling plus 25% small single-axis commands; without them
+        # (0.1, 0, 0) looked like a standing env and the policy stood still for it (runs v4-v6)
+        base = self.commands.base_velocity
+        self.commands.base_velocity = RobotDogVelocityCommandCfg(
+            **{f.name: getattr(base, f.name) for f in dataclasses.fields(base) if f.name != "class_type"},
+            rel_small_envs=0.25,
+        )
+        # a 0.26 m tall, 8.8 kg dog
         self.commands.base_velocity.ranges.lin_vel_x = (-0.8, 0.8)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)

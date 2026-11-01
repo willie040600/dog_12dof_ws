@@ -12,6 +12,7 @@ def make_eval_env_cfg(num_envs, episode_length_s=1000.0):
     cmd = cfg.commands.base_velocity
     cmd.resampling_time_range = (1000.0, 1000.0)
     cmd.rel_standing_envs = 0.0
+    cmd.rel_small_envs = 0.0
     cmd.debug_vis = False
     # spawn exactly at the env origin, standing pose, at rest
     cfg.events.reset_base.params["pose_range"] = {}

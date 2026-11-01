@@ -100,6 +100,8 @@ uv run --extra isaacsim python $S/stand_test.py
   - 零指令環境 10%：學會站著不動
   - 速度追蹤獎勵 `std` 0.25（第 1 階段覆寫成 0.5）：Nav2 常送 0.05～0.2 的小指令，低速也要追準
   - `feet_air_time` 門檻 0.5 → 0.2 s：這隻狗每步騰空不到 0.5 s，預設值會讓每一步都扣分，策略學成站著不動
+  - `feet_air_time` 改成 `feet_air_time_any_motion`（`velocity/mdp.py`）：`|cmd_xy| > 0.05` 或 `|wz| > 0.05` 就給抬腳獎勵；
+    Isaac Lab 原版只看 `|cmd_xy| > 0.1`，0.1 m/s 和原地轉向的指令因此學成站著不動
 - 馬達加了 armature 0.01 kg·m²（減速馬達的轉子等效慣量）。沒有它時，腿很輕、dt 0.005 s 下的 PD 會數值發散，
   腳一離地關節速度就爆掉。
 - 馬達（25 N·m、30 rad/s）與質量都是暫定值，換成實際規格後再訓練。
