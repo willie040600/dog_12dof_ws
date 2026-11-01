@@ -47,10 +47,12 @@ class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.undesired_contacts.params["sensor_cfg"].body_names = ".*_thigh"
         self.rewards.track_lin_vel_xy_exp.weight = 1.5
         self.rewards.track_ang_vel_z_exp.weight = 0.75
-        # Isaac Lab's 0.5: with 0.25 (run v1) the reward for a 0.4 m/s error is ~0, so the policy
-        # settled on standing still and never learned to walk
-        self.rewards.track_lin_vel_xy_exp.params["std"] = 0.5
-        self.rewards.track_ang_vel_z_exp.params["std"] = 0.5
+        # 0.25 (Isaac Lab: 0.5) so ignoring a 0.1 m/s command costs 15% of the tracking reward instead of 4%;
+        # Nav2 sends such commands. Learning to walk from scratch is easier at 0.5, so stage 1 overrides it:
+        #   train.py ... env.rewards.track_lin_vel_xy_exp.params.std=0.5 env.rewards.track_ang_vel_z_exp.params.std=0.5
+        # and stage 2 fine-tunes from that checkpoint with this default (isaaclab/README.md)
+        self.rewards.track_lin_vel_xy_exp.params["std"] = 0.25
+        self.rewards.track_ang_vel_z_exp.params["std"] = 0.25
         self.rewards.dof_torques_l2.weight = -0.0002
         self.rewards.dof_acc_l2.weight = -2.5e-7
         self.rewards.flat_orientation_l2.weight = -2.5

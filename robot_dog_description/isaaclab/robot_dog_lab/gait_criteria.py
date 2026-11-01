@@ -4,6 +4,7 @@ from typing import Optional, Sequence, Tuple
 
 LIN_TOL = 0.1          # m/s
 ANG_TOL = 0.15         # rad/s
+REL_TOL = 0.5          # error must also be below half the command
 DRIFT_TOL = 0.1        # m, horizontal drift over STAND_MEASURE_S on a zero command
 WARMUP_S = 2.0
 MEASURE_S = 5.0
@@ -42,8 +43,10 @@ def judge_case(case, mean_vel, drift, falls):
         if drift < DRIFT_TOL:
             return True, 'drift %.3f m' % drift
         return False, 'drift %.3f m >= %.2f' % (drift, DRIFT_TOL)
-    tol = ANG_TOL if case.axis == 2 else LIN_TOL
-    err = abs(mean_vel[case.axis] - case.command[case.axis])
+    # also within half the command, so standing still cannot pass a small command (error = |command|)
+    target = case.command[case.axis]
+    tol = min(ANG_TOL if case.axis == 2 else LIN_TOL, REL_TOL * abs(target))
+    err = abs(mean_vel[case.axis] - target)
     if err < tol:
         return True, '%s error %.3f' % (AXES[case.axis], err)
     return False, '%s error %.3f >= %.2f' % (AXES[case.axis], err, tol)

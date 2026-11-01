@@ -14,9 +14,10 @@ def test_commands_match_spec():
 
 def test_tracking_reward_std():
     r = RobotDogFlatEnvCfg().rewards
-    # v1 with std 0.25 never learned to walk (stand-still optimum); 0.5 is Isaac Lab's default
-    assert r.track_lin_vel_xy_exp.params["std"] == pytest.approx(0.5)
-    assert r.track_ang_vel_z_exp.params["std"] == pytest.approx(0.5)
+    # 0.25 so ignoring a 0.1 m/s command costs 15% of the reward (0.5: 4%, v4 stood still below 0.1);
+    # stage 1 from scratch overrides it to 0.5 on the command line (see isaaclab/README.md)
+    assert r.track_lin_vel_xy_exp.params["std"] == pytest.approx(0.25)
+    assert r.track_ang_vel_z_exp.params["std"] == pytest.approx(0.25)
 
 
 def test_legs_have_armature():

@@ -225,7 +225,8 @@ uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaaclab/scr
 ```
 
 和 Isaac Lab 預設的速度追蹤任務相比，為了配合 Nav2 改了：`heading_command=False`（wz 直接取樣）、
-零指令環境 10%、速度追蹤獎勵 `std` 0.25（低速也追得準）。
+零指令環境 10%、速度追蹤獎勵 `std` 0.25（低速也追得準，分兩階段訓練）、`feet_air_time` 門檻 0.2 s，
+馬達另加 armature 0.01 kg·m²（沒有它腿一離地 PD 就數值發散）。
 
 目前只做平地任務。崎嶇地形需要高度掃描器掛在 `base_link` 上，
 而 Isaac Sim 6 匯入後的連桿位在 `Geometry/` 之下，路徑要先在你的環境確認，所以先不放。

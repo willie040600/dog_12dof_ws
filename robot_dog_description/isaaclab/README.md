@@ -36,11 +36,16 @@ Isaac Lab 3.0 沒有 `--headless`：預設就不開畫面，要看畫面才加 `
 ```bash
 # 先用少量環境試跑 5 個 iteration，確認 URDF 轉換、接觸感測器都正常（第一次會先把 URDF 轉成 USD）
 uv run --extra isaacsim python $S/train.py --task RobotDog-Velocity-Flat --num_envs 64 --max_iterations 5 --run_name smoke
-# 正式訓練（預設 4096 個環境、1000 iterations）
-uv run --extra isaacsim python $S/train.py --task RobotDog-Velocity-Flat --run_name v1
-# 從上一版接著訓練 1000 iterations
-uv run --extra isaacsim python $S/train.py --task RobotDog-Velocity-Flat --checkpoint <run 資料夾>/model_<N>.pt --max_iterations 1000 --run_name v2
+# 第 1 階段：從頭學會走（追蹤獎勵 std 覆寫成 0.5；4096 個環境、1000 iterations，約 13 分鐘）
+uv run --extra isaacsim python $S/train.py --task RobotDog-Velocity-Flat --run_name stage1 \
+    env.rewards.track_lin_vel_xy_exp.params.std=0.5 env.rewards.track_ang_vel_z_exp.params.std=0.5
+# 第 2 階段：從第 1 階段接著訓練 1000 iterations，用預設 std 0.25 把低速追準
+uv run --extra isaacsim python $S/train.py --task RobotDog-Velocity-Flat --run_name stage2 \
+    --checkpoint <第 1 階段的 run 資料夾>/model_999.pt --max_iterations 1000
 ```
+
+為什麼分兩階段：std 0.25 時，誤差 0.4 m/s 的獎勵幾乎是 0，從頭訓練容易學成「站著不動」；
+std 0.5 學得會走，但忽略 0.1 m/s 的指令只少 4% 獎勵，所以 ±0.1 的指令狗會直接站著。
 
 紀錄與 checkpoint 在 `~/IsaacLab/logs/rsl_rl/robot_dog_flat/<時間>_<run_name>/`。
 顯示卡記憶體不夠時降低 `--num_envs`（例如 2048）。
@@ -70,6 +75,7 @@ uv run --extra isaacsim python $S/gait_eval.py --policy_dir ~/dog_12dof_ws/robot
 ```
 
 17 個情境同時跑（每個一個環境、指令固定、沒有推力與雜訊）：暖身 2 秒後量 5 秒平均速度。全部通過時 exit 0。
+誤差除了小於下表門檻，也要小於指令大小的一半（站著不動不能通過 ±0.1 的指令）。
 
 | 項目 | 指令 | 通過 |
 |---|---|---|
@@ -92,7 +98,10 @@ uv run --extra isaacsim python $S/stand_test.py
 - 為了配合 Nav2，和 Isaac Lab 預設的速度追蹤任務相比改了：
   - `heading_command=False`：wz 直接取樣（Nav2 直接送 wz）
   - 零指令環境 10%：學會站著不動
-  - 速度追蹤獎勵 `std` 0.25：Nav2 常送 0.05～0.2 的小指令，低速也要追準
+  - 速度追蹤獎勵 `std` 0.25（第 1 階段覆寫成 0.5）：Nav2 常送 0.05～0.2 的小指令，低速也要追準
+  - `feet_air_time` 門檻 0.5 → 0.2 s：這隻狗每步騰空不到 0.5 s，預設值會讓每一步都扣分，策略學成站著不動
+- 馬達加了 armature 0.01 kg·m²（減速馬達的轉子等效慣量）。沒有它時，腿很輕、dt 0.005 s 下的 PD 會數值發散，
+  腳一離地關節速度就爆掉。
 - 馬達（25 N·m、30 rad/s）與質量都是暫定值，換成實際規格後再訓練。
 
 ## 測試

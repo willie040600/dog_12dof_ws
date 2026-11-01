@@ -21,6 +21,14 @@ def test_linear_tolerance():
     assert not judge_case(_case("vy-0.10"), (0.0, 0.01, 0.0), 0.0, 0)[0]
 
 
+def test_standing_still_fails_small_commands():
+    # a policy that ignores 0.1 m/s commands has error exactly 0.1 and must not pass (Nav2 sends such commands)
+    assert not judge_case(_case("vx+0.10"), (0.0, 0.0, 0.0), 0.0, 0)[0]
+    assert not judge_case(_case("vy-0.10"), (0.0, 0.0, 0.0), 0.0, 0)[0]
+    assert not judge_case(_case("wz+0.20"), (0.0, 0.0, 0.07), 0.0, 0)[0]
+    assert judge_case(_case("vx+0.10"), (0.06, 0.0, 0.0), 0.0, 0)[0]
+
+
 def test_angular_tolerance():
     assert judge_case(_case("wz+0.50"), (0.0, 0.0, 0.64), 0.0, 0)[0]
     assert not judge_case(_case("wz+0.50"), (0.0, 0.0, 0.66), 0.0, 0)[0]
