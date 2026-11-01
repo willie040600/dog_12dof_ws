@@ -41,12 +41,16 @@ class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         # rewards: the foot sphere is a collision of the calf link
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_calf"
         self.rewards.feet_air_time.weight = 0.25
+        # reward = air time - threshold per touchdown; Isaac Lab's 0.5 s (Go1-sized) turned every step of
+        # this smaller dog into a penalty, and runs v1/v2 learned to stand still
+        self.rewards.feet_air_time.params["threshold"] = 0.2
         self.rewards.undesired_contacts.params["sensor_cfg"].body_names = ".*_thigh"
         self.rewards.track_lin_vel_xy_exp.weight = 1.5
         self.rewards.track_ang_vel_z_exp.weight = 0.75
-        # narrower than Isaac Lab's 0.5 so the small commands Nav2 sends (0.05-0.2) are still worth tracking
-        self.rewards.track_lin_vel_xy_exp.params["std"] = 0.25
-        self.rewards.track_ang_vel_z_exp.params["std"] = 0.25
+        # Isaac Lab's 0.5: with 0.25 (run v1) the reward for a 0.4 m/s error is ~0, so the policy
+        # settled on standing still and never learned to walk
+        self.rewards.track_lin_vel_xy_exp.params["std"] = 0.5
+        self.rewards.track_ang_vel_z_exp.params["std"] = 0.5
         self.rewards.dof_torques_l2.weight = -0.0002
         self.rewards.dof_acc_l2.weight = -2.5e-7
         self.rewards.flat_orientation_l2.weight = -2.5

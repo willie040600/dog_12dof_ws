@@ -108,7 +108,9 @@
 - **致動器**：`DCMotorCfg`，effort 25 N·m、saturation 25 N·m、速度 30 rad/s、kp 20、kd 0.5（現有設定）。
 - **物理**：sim dt 0.005 s、decimation 4（策略 50 Hz），PhysX，solver 4/0，關閉自碰撞，地面摩擦 1.0。
 - **要改的四處：**
-  1. 速度追蹤獎勵（`track_lin_vel_xy_exp`、`track_ang_vel_z_exp`）的 `std` 從 0.5 調成 **0.25**，讓低速也有動力追準。
+  1. 速度追蹤獎勵的 `std` **維持 Isaac Lab 預設 0.5**（原本想調成 0.25 讓低速追得更準；run v1 用 0.25 時策略只學會站著，
+     所以先用 0.5 學會走，低速不夠準時再從會走的 checkpoint 接著用 0.25 微調）。
+     `feet_air_time` 的 `threshold` 從 0.5 s 改成 **0.2 s**：這隻狗每步的騰空時間短於 0.5 s，預設值會讓每一步都扣分（run v1–v2）。
   2. `commands.base_velocity.rel_standing_envs` 從 0.02 調成 **0.1**，讓策略學會零指令時站穩不踏步。
   3. 指令範圍維持 vx ±0.8、vy ±0.5、wz ±1.0。Nav2 的上限在範圍之內（第 6 節）。
   4. `commands.base_velocity.heading_command` 從 True 改成 **False**：wz 直接均勻取樣，和 Nav2 直接送 wz 的用法相同
