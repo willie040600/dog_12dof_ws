@@ -349,6 +349,16 @@ slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 �
 
 1. **計畫 1：M0 + M1**：環境確認、Isaac Sim 模組重構、RL 訓練、評估、匯出。
 2. **計畫 2：M2 + M3**：`policy_runner`、一致性測試、導航模式的 ROS 2 橋接、`odom_footprint`、`scan_ground_filter`。
+   計畫 1 留給計畫 2 的事項（2026-11-01 計畫 1 結案時記錄）：
+   - `policy.json` 還沒記錄的物理設定，M2 前要從訓練紀錄的 `params/env.yaml` 補進去：rigid body 的
+     `max_depenetration_velocity` 1.0、線/角阻尼 0、最大線/角速度 1000；PhysX scene 的 `solver_type` 1（TGS）、
+     `bounce_threshold_velocity` 0.5、`friction_offset_threshold` 0.04、`friction_correlation_distance` 0.025、
+     `enable_stabilization` false。
+   - 訓練時 Isaac Lab 3.0 預設 `sim.use_newton_actuators: true`，DC 馬達是由 Newton 的 `ClampingDCMotor` 計算的；
+     公式和 `isaaclab.actuators.DCMotor` 相同，第 8 節的單元測試比對對象不變，但一致性除錯時要知道這點。
+   - `observations.py` 要檢查 `obs_terms` 的名稱與順序。匯出目前只檢查關節集合；要另外確認 `joint_names` 等於
+     articulation 順序，否則 `joint_pos_rel` / `joint_vel_rel` 的順序可能和 `joint_names` 不同。
+   - `robot_dog_isaac.py --effort` 模式沒有 armature；若用外部 PD 驅動，可能和訓練初期一樣數值發散。
 3. **計畫 3：M4 + M5**：slam_toolbox、AMCL、Nav2 參數、RViz、`nav_eval`。
 
 ## 8. 測試
