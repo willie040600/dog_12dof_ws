@@ -87,16 +87,17 @@
 | 套件 | 位置 | 角色 |
 |---|---|---|
 | `robot_dog_description` | `~/dog_12dof_ws/robot_dog_description`（已存在） | URDF、網格、感測器規格、Isaac Sim 執行端、策略檔 |
-| `robot_dog_lab` | 原始檔在 `robot_dog_description/isaaclab/robot_dog_lab/`，由 `setup_robot_dog_lab.sh` 複製進 `~/projects/robot_dog_lab` | Isaac Lab 訓練任務、評估、匯出 |
+| `robot_dog_lab` | `robot_dog_description/isaaclab/robot_dog_lab/`，由 `isaaclab/scripts/*.py` 直接 import，在 `~/IsaacLab` 的 uv 環境執行（和舊 8 自由度狗相同，不另建 Isaac Lab 外部專案，以免再裝一份 Isaac Sim） | Isaac Lab 訓練任務、評估、匯出 |
 | `robot_dog_navigation` | `~/dog_12dof_ws/robot_dog_navigation`（**新增**，ament_python） | launch、Nav2／slam_toolbox／AMCL 參數、地圖、RViz、兩個 ROS 節點、`nav_eval.py` |
 
 ## 4. RL 步態訓練（`robot_dog_lab`）
 
 ### 4.1 先讓現有任務跑起來
 
-1. `setup_robot_dog_lab.sh ~/IsaacLab ~/projects` 建立專案。
-2. smoke test：`--num_envs 64 --max_iterations 5`，確認 URDF→USD 轉換成功、`.*_calf` 接觸感測器有數值。
-3. 站立測試：零指令 5 秒，機身高度應接近 0.26 m（MuJoCo 測過 0.226 m，kp 20 承重下會下沉），16 隻都沒倒。
+1. 新增 `isaaclab/scripts/train.py`（註冊任務後呼叫 `isaaclab_rl.entrypoints.run_train_cli`），
+   刪除 `setup_robot_dog_lab.sh`。
+2. smoke test：`--num_envs 64 --max_iterations 5`，確認 URDF→USD 轉換成功、`.*_calf` 接觸感測器能解析。
+3. 站立測試：零動作 5 秒，16 隻的機身高度都在 0.20～0.28 m（MuJoCo 測過 0.226 m，kp 20 承重下會下沉），沒有一隻倒下。
 
 ### 4.2 任務內容（`RobotDog-Velocity-Flat`）
 
@@ -106,10 +107,12 @@
 - **動作**：12 維，`關節目標 = 預設站姿 + 0.25 × action`。站姿：hip 0、thigh 0.8、calf −1.5 rad。
 - **致動器**：`DCMotorCfg`，effort 25 N·m、saturation 25 N·m、速度 30 rad/s、kp 20、kd 0.5（現有設定）。
 - **物理**：sim dt 0.005 s、decimation 4（策略 50 Hz），PhysX，solver 4/0，關閉自碰撞，地面摩擦 1.0。
-- **要改的三處：**
+- **要改的四處：**
   1. 速度追蹤獎勵（`track_lin_vel_xy_exp`、`track_ang_vel_z_exp`）的 `std` 從 0.5 調成 **0.25**，讓低速也有動力追準。
   2. `commands.base_velocity.rel_standing_envs` 從 0.02 調成 **0.1**，讓策略學會零指令時站穩不踏步。
   3. 指令範圍維持 vx ±0.8、vy ±0.5、wz ±1.0。Nav2 的上限在範圍之內（第 6 節）。
+  4. `commands.base_velocity.heading_command` 從 True 改成 **False**：wz 直接均勻取樣，和 Nav2 直接送 wz 的用法相同
+     （Isaac Lab 預設是由航向誤差算出 wz）。
 - 領域隨機化保留 Isaac Lab 預設（摩擦、機身質量、推力、外力）。
 - PPO：現有 `rsl_rl_ppo_cfg.py`（128×3 MLP），4096 個環境、1000 iterations。
 
@@ -136,23 +139,31 @@
 ```json
 {
   "task": "RobotDog-Velocity-Flat",
-  "run": "<run 名稱>",
-  "joint_names": ["<策略的關節順序，依 Isaac Lab articulation>"],
+  "run": "<run 資料夾名稱>",
+  "checkpoint": "model_999.pt",
+  "joint_names": ["<策略的關節順序，取自動作項的關節清單>"],
   "default_joint_pos": [0.0, 0.8, -1.5],
   "action_scale": 0.25,
-  "obs_terms": [{"name": "base_lin_vel", "dim": 3, "scale": 1.0}],
+  "clip_actions": null,
+  "obs_terms": [{"name": "base_lin_vel", "dim": 3, "scale": null, "clip": null}],
   "sim_dt": 0.005,
   "decimation": 4,
   "actuator": {"type": "DCMotor", "stiffness": 20.0, "damping": 0.5,
                "effort_limit": 25.0, "saturation_effort": 25.0, "velocity_limit": 30.0},
   "physx": {"solver_position_iterations": 4, "solver_velocity_iterations": 0, "self_collisions": false},
-  "ground": {"static_friction": 1.0, "dynamic_friction": 1.0, "restitution": 0.0},
+  "materials": {
+    "ground": {"static_friction": 1.0, "dynamic_friction": 1.0, "restitution": 0.0,
+               "friction_combine_mode": "multiply", "restitution_combine_mode": "multiply"},
+    "robot": {"static_friction": 0.8, "dynamic_friction": 0.6, "restitution": 0.0}
+  },
   "command_ranges": {"lin_vel_x": [-0.8, 0.8], "lin_vel_y": [-0.5, 0.5], "ang_vel_z": [-1.0, 1.0]},
   "spawn_height": 0.32
 }
 ```
 
-（`default_joint_pos` 是長度 12、與 `joint_names` 同序的陣列，`obs_terms` 列出全部 7 項；上面只是格式示意。）
+（`default_joint_pos` 是長度 12、與 `joint_names` 同序的陣列，`obs_terms` 依序列出全部 7 項；上面只是格式示意。
+`materials.robot` 是 Isaac Lab `physics_material` 事件給機器人所有連桿的摩擦，與地面以 multiply 組合。）
+讀寫與檢查都在 `isaac/robot_dog_sim/policy_meta.py`（純 Python），匯出端和 Isaac Sim 端共用。
 
 **關節順序依名稱對應**：Isaac Lab articulation 的順序不一定等於 ROS 的 FL/FR/RL/RR 順序（舊 8 自由度狗是
 「所有大腿，再所有小腿」）。Isaac Sim 端一律用 `joint_names` 找索引，不假設順序。
@@ -164,18 +175,24 @@
 ```
 isaac/
 ├── robot_dog_sim/
-│   ├── __init__.py
+│   ├── __init__.py       空白（純 Python 模組要能用系統 python3 import）
+│   ├── util.py           log、try_step、require_ros_jazzy（純 Python）
+│   ├── robot_spec.py     站姿、馬達上限、感測器位置等常數（純 Python）
+│   ├── kit.py            啟用擴充套件、開新 stage
 │   ├── robot.py          匯入 URDF→USD、依名稱找連桿/關節、設定出生姿態與驅動模式
 │   ├── sensors.py        IMU、RTX 2D LiDAR、RGB 相機（位置與 URDF 感測器 frame 相同）
 │   ├── world.py          產生室內世界（或載入 --world 指定的 USD）
 │   ├── ros_graph.py      OmniGraph 發佈器：clock、joint_states、imu、scan、camera、odom_gt、
 │   │                     以及 ros2_control 模式用的 /isaac_joint_states、/isaac_joint_commands
+│   ├── policy_meta.py    policy.json 讀寫與檢查（純 Python，匯出端共用）
 │   ├── actuator.py       DC 馬達力矩公式（純 torch/numpy，可單元測試）
 │   ├── observations.py   依 policy.json 組觀測（純函式，可單元測試）
 │   └── policy_runner.py  載入策略、physics callback、站立保持、cmd_vel 逾時、跌倒偵測
 ├── robot_dog_isaac.py    現有 ros2_control 模式，改用上面的模組，指令列參數與行為不變
 ├── robot_dog_nav_sim.py  導航模式入口
 ├── policy_parity.py      M2 一致性測試（不接 ROS）
+├── tools/rclpy_probe.py  M0：確認 rclpy 與 OmniGraph ROS 2 橋接能在同一程序共存
+├── tests/                pytest
 └── policies/<run>/       policy.pt、policy.json
 ```
 
@@ -197,9 +214,10 @@ cd ~/IsaacLab && uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_descrip
   - 每 `decimation` 步：讀 articulation 狀態 → `observations.py` 組 48 維觀測 → `policy.pt` 推論 →
     `q_target = default + action_scale × action`，記錄 `last_action`。
   - 每一步：`actuator.py` 依 Isaac Lab `DCMotor` 公式算力矩
-    （`τ = kp(q_target − q) − kd·q̇`，再截斷在 `[τmin, τmax]`，
-    `τmax = clip(sat × (1 − q̇/vlim), 0, effort_limit)`、`τmin = clip(sat × (−1 − q̇/vlim), −effort_limit, 0)`，
-    `sat` = saturation_effort、`vlim` = velocity_limit，與 Isaac Lab `DCMotor` 實作一致）→ 施加到關節。
+    （`τ = kp(q_target − q) − kd·q̇`；`v = clip(q̇, ±vlim·(1 + effort_limit/sat))`；
+    `τmax = min(sat·(1 − v/vlim), effort_limit)`、`τmin = max(sat·(−1 − v/vlim), −effort_limit)`；
+    `τ` 截斷在 `[τmin, τmax]`。`sat` = saturation_effort、`vlim` = velocity_limit，與 Isaac Lab
+    `DCMotor._clip_effort` 相同）→ 施加到關節。
 - 觀測中的 `base_lin_vel`、`base_ang_vel` 用 articulation 根部真值轉到機身座標系，和 Isaac Lab 一樣。
 - 渲染 50 Hz（每個策略步一幀）。模擬慢於即時只會讓 sim time 變慢，步態不受影響。
 
@@ -227,7 +245,7 @@ cd ~/IsaacLab && uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_descrip
 - 10 × 10 m 房間，四面外牆高 1.0 m、厚 0.1 m。
 - 兩道內牆把房間分成三個區域，留 1.0 m 寬的通道。
 - 4 個方塊（0.4～0.6 m）、3 個圓柱（直徑 0.3 m），高度都高於 LiDAR 掃描平面（約 0.34 m）。
-- 地面摩擦和訓練時相同。出生點在原點，四周 1 m 內淨空。
+- 地面與機器人的摩擦材質取自 `policy.json` 的 `materials`。出生點在原點，四周 1 m 內淨空。
 - 整個場景用程式產生，不依賴網路或 Nucleus 素材，每次都相同。`--world` 可以改載其他 USD。
 
 ## 6. Nav2 與 ROS 端（`robot_dog_navigation`）
@@ -306,7 +324,7 @@ slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 �
 
 | # | 內容 | 通過條件 |
 |---|---|---|
-| M0 | 環境確認 | `colcon build` 兩個 ROS 套件成功；Isaac Sim Python（source Jazzy 後）能 `import rclpy` 並收發一則訊息；重構後的 `robot_dog_isaac.py` 列出各感測器 ok，`isaac.launch.py` + `stand_up.py` 能讓狗站起來 |
+| M0 | 環境確認 | 安裝 `ros-jazzy-joint-state-topic-hardware-interface`；`colcon build` `robot_dog_description` 成功（`robot_dog_navigation` 在 M3 才建）；Isaac Sim 程序內的 rclpy 能收到同程序 OmniGraph 發佈的 `/clock`；重構後的 `robot_dog_isaac.py` 列出各感測器 ok，`isaac.launch.py` + `stand_up.py` 能讓狗站起來 |
 | M1 | RL 訓練 | 4.1 三步通過；正式訓練完成；`gait_eval.py` 全部通過（4.3）；匯出 `policy.pt` + `policy.json` |
 | M2 | Isaac Sim 跑策略 | `policy_parity.py`：同一段 60 秒指令序列（前進、側移、轉向、停止各段）分別在 Isaac Lab（單一環境、無雜訊無推力）與 Isaac Sim（無 ROS、無感測器）執行，**每段平均機身速度差 < 0.05 m/s、角速度差 < 0.1 rad/s**，兩邊都沒跌倒 |
 | M3 | ROS 2 橋接 | 3.1 表內話題頻率正確（`ros2 topic hz`）；`view_frames` 的 TF 樹與 3.2 相同；`teleop_twist_keyboard` 能讓狗前進、側移、轉彎；停送 `cmd_vel` 後 0.5 s 內進入站立 |
@@ -353,7 +371,7 @@ slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 �
 | 低速追蹤不夠準 | M1 | 回 M1 調獎勵或指令取樣，**不加**查表補丁 |
 | Isaac Lab 與 Isaac Sim 的物理設定有落差 | M2 | 設定全部來自 `policy.json`；M2 不過就逐項比對，再進 M3 |
 | 筆電同時跑 RTX LiDAR、相機、Nav2 太慢 | M3 | `--no-camera`、`--headless`；只影響速度，不影響正確性 |
-| `setup_robot_dog_lab.sh` 用的 `isaaclab --new` 等 CLI 與實際 3.0 不符 | M1 | 以 `~/IsaacLab` 原始碼為準修正腳本 |
+| Isaac Lab 外部專案需要另一個 uv 環境（再裝一份 Isaac Sim） | 已處理 | 改用 `isaaclab/scripts/*.py` 直接在 `~/IsaacLab` 環境執行（4.1） |
 
 ## 11. 文件
 
