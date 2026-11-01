@@ -10,6 +10,7 @@ process. Exit code 0 when at least 10 messages with a positive stamp arrived, 1 
 import argparse
 import os
 import sys
+import traceback
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..'))
 
@@ -73,6 +74,7 @@ def main():
 code = 1
 try:
     code = main()
+except Exception:
+    traceback.print_exc()  # close() ends the process with _exit(), so print before it
 finally:
-    simulation_app.close()
-sys.exit(code)
+    simulation_app.close(exit_code=code)

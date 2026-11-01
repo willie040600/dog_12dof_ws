@@ -1,8 +1,11 @@
 """Load robot_dog into Isaac Sim 6.2 and expose it to ROS 2 the same way as Gazebo.
 
-Run with Isaac Sim's own Python, in a shell where ROS 2 Jazzy is sourced:
-  ~/isaacsim/python.sh robot_dog_isaac.py            # Isaac PD drives follow position commands
-  ~/isaacsim/python.sh robot_dog_isaac.py --effort   # drives off, joints take torques
+Run with the Isaac Sim 6.2 pip install in ~/IsaacLab's uv environment, ROS 2 Jazzy sourced:
+  source /opt/ros/jazzy/setup.bash
+  cd ~/IsaacLab && export OMNI_KIT_ACCEPT_EULA=yes
+  uv run --extra isaacsim python <path>/robot_dog_isaac.py            # Isaac PD drives follow position commands
+  uv run --extra isaacsim python <path>/robot_dog_isaac.py --effort   # drives off, joints take torques
+  ... --headless --max-frames 600                                     # smoke test: run 600 frames, then exit 0
 Then on the ROS 2 side:
   ros2 launch robot_dog_description isaac.launch.py [command:=effort]
 
@@ -18,9 +21,15 @@ import dataclasses
 import glob
 import math
 import os
+import sys
 import tempfile
+import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+from robot_dog_sim.util import log, require_ros_jazzy, try_step  # noqa: E402
+
 parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
 parser.add_argument('--urdf', default=os.path.join(HERE, '..', 'urdf', 'robot_dog_rl.urdf'))
 parser.add_argument('--usd', help='reference an already converted USD instead of importing the URDF')
@@ -31,7 +40,9 @@ parser.add_argument('--kp', type=float, default=20.0, help='drive stiffness, N*m
 parser.add_argument('--kd', type=float, default=0.5, help='drive damping, N*m*s/rad')
 parser.add_argument('--physics-hz', type=int, default=500)
 parser.add_argument('--headless', action='store_true')
+parser.add_argument('--max-frames', type=int, default=0, help='exit after this many app updates (0: run until closed)')
 args, _ = parser.parse_known_args()
+require_ros_jazzy()
 
 from isaacsim import SimulationApp  # noqa: E402  must start before any other omni import
 
@@ -68,10 +79,6 @@ for _name in ('isaacsim.asset.importer.urdf', 'isaacsim.core.nodes', 'isaacsim.s
 omni.usd.get_context().new_stage()
 simulation_app.update()
 stage = omni.usd.get_context().get_stage()
-
-
-def log(msg):
-    print('[robot_dog] ' + msg, flush=True)
 
 
 # ---------------- scene ----------------
@@ -135,6 +142,11 @@ def load_robot():
     log('robot USD: %s' % usd)
     prim = stage.DefinePrim('/World/robot_dog', 'Xform')
     prim.GetReferences().AddReference(usd)
+    # the importer puts joints/articulation/mass behind an unselected "Physics" variant set;
+    # pick the backend-portable one, as Isaac Lab's converter does by default
+    variants = prim.GetVariantSets()
+    if variants.HasVariantSet('Physics'):
+        variants.GetVariantSet('Physics').SetVariantSelection('physics')
     UsdGeom.Xformable(prim).AddTranslateOp().Set(Gf.Vec3d(0, 0, SPAWN_Z))
     simulation_app.update()
     return prim
@@ -315,16 +327,6 @@ def lidar_graph(base_path):
            ('Context.outputs:context', 'PubScan.inputs:context')])
 
 
-def step(label, fn, *a):
-    try:
-        fn(*a)
-        log('%-34s ok' % label)
-        return True
-    except Exception as e:
-        log('%-34s FAILED: %s' % (label, e))
-        return False
-
-
 def main():
     setup_world()
     root = load_robot()
@@ -336,18 +338,24 @@ def main():
         art.GetPath(), base.GetPath(), 'effort' if args.effort else 'position (kp=%g kd=%g)' % (args.kp, args.kd)))
 
     base_path = base.GetPath().pathString
-    if not step('joint states / commands / clock', joint_graph, art.GetPath().pathString):
+    if not try_step('joint states / commands / clock', joint_graph, art.GetPath().pathString):
         log('ros2_control cannot reach the robot without the joint graph')
-    step('IMU -> /imu', imu_graph, base_path)
-    step('camera -> /camera/image_raw', camera_graph, base_path)
-    step('LiDAR', lidar_graph, base_path)
+    try_step('IMU -> /imu', imu_graph, base_path)
+    try_step('camera -> /camera/image_raw', camera_graph, base_path)
+    try_step('LiDAR', lidar_graph, base_path)
 
     omni.timeline.get_timeline_interface().play()
-    while simulation_app.is_running():
+    frames = 0
+    while simulation_app.is_running() and (args.max_frames <= 0 or frames < args.max_frames):
         simulation_app.update()
+        frames += 1
 
 
+exit_code = 0
 try:
     main()
+except Exception:
+    traceback.print_exc()  # close() ends the process with _exit(), so print before it
+    exit_code = 1
 finally:
-    simulation_app.close()
+    simulation_app.close(exit_code=exit_code)

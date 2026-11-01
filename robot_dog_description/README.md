@@ -148,17 +148,28 @@ Isaac Sim 發佈 `/isaac_joint_states`、訂閱 `/isaac_joint_commands`（都是
 | LiDAR | `/scan` | `/scan`（RTX `Example_Rotary_2D`；沒有此設定時改發 `/scan/points`） |
 | 相機 | `/camera/image_raw` | `/camera/image_raw` |
 
-1. 在 Isaac Sim 那台機器（需要 RTX 顯卡；Ubuntu 24.04 + Jazzy 最單純），先 source ROS 2 再啟動：
+需要的 ROS 套件（Isaac 模式的 hardware interface）：
+```bash
+sudo apt install -y ros-jazzy-joint-state-topic-hardware-interface
+```
+
+1. Isaac Sim 6.2 用 `~/IsaacLab` uv 環境裡的 pip 版，先 source ROS 2 再啟動（沒 source 會直接結束並提示）：
    ```bash
    source /opt/ros/jazzy/setup.bash
-   ~/isaacsim/python.sh ~/ros2_ws/src/robot_dog_description/isaac/robot_dog_isaac.py
+   cd ~/IsaacLab && export OMNI_KIT_ACCEPT_EULA=yes
+   uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/robot_dog_isaac.py
    ```
    終端會逐項列出 `joint states / IMU / camera / LiDAR ... ok`。
+   加 `--headless` 不開視窗；加 `--max-frames 600` 跑 600 幀後自動結束（exit 0 = 正常），可當 smoke test。
+   程式出錯時會印出 traceback 並以 exit 1 結束。
 2. 另一個終端：
    ```bash
+   cd ~/dog_12dof_ws && source install/setup.bash
    ros2 launch robot_dog_description isaac.launch.py
    ros2 run robot_dog_description stand_up.py --ros-args -p use_sim_time:=true
    ```
+   kp 20 承重下會下沉：站穩後 thigh 約 0.76～0.79、calf 約 −1.61～−1.66 rad（目標 0.8 / −1.5）。
+   筆電上同時跑 RTX LiDAR 和相機，模擬大約是即時的 0.75 倍，所以 `ros2 topic hz /scan` 看到的是約 7.5 Hz（sim time 10 Hz）。
 3. 力矩控制（RL 策略自己做 PD）：
    `robot_dog_isaac.py --effort` 搭配 `isaac.launch.py command:=effort`，
    指令送到 `/joint_group_effort_controller/commands`。
@@ -168,6 +179,8 @@ Isaac Sim 發佈 `/isaac_joint_states`、訂閱 `/isaac_joint_commands`（都是
   `URDFParseAndImportFile`）、LiDAR 用 `isaacsim.sensors.experimental.rtx`、
   ROS 2 節點來自 `isaacsim.ros2.nodes`。匯入後的連桿在 `Geometry/`、關節在 `Physics/` 之下，
   腳本以名稱搜尋，所以不受階層影響。
+- Isaac Sim importer 把關節、articulation、質量放在 `Physics` variant set 裡，而且預設不選，
+  所以腳本載入時會選 `physics`（和 Isaac Lab 轉檔的預設相同），否則會找不到任何關節。
 - 感測器各自獨立，若某項顯示 `FAILED`，其他功能照常，可在 GUI 手動補上該感測器
   （掛在 `base_link` 下，位置見上面的感測器表）。
 - 也可以用 Isaac Lab 轉好的 USD：
