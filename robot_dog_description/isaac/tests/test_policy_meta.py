@@ -118,3 +118,58 @@ def test_save_leaves_no_file_on_unserializable_value(valid_meta, tmp_path):
     with pytest.raises((TypeError, PolicyMetaError)):
         save_policy_meta(valid_meta, str(p))
     assert not p.exists()
+
+
+@pytest.mark.parametrize('path, value', [
+    (('action_scale',), None),
+    (('action_scale',), '0.25'),
+    (('spawn_height',), 'high'),
+    (('clip_actions',), 'yes'),
+    (('clip_actions',), -1.0),
+    (('sim_dt',), float('nan')),
+    (('actuator', 'stiffness'), float('inf')),
+    (('physx', 'solver_position_iterations'), '4'),
+    (('physx', 'self_collisions'), 'no'),
+    (('materials', 'ground', 'static_friction'), 'high'),
+    (('materials', 'ground', 'friction_combine_mode'), 'bogus'),
+    (('materials', 'robot', 'dynamic_friction'), float('nan')),
+])
+def test_bad_values_are_refused_by_name(valid_meta, path, value):
+    target = valid_meta
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    with pytest.raises(PolicyMetaError, match=path[-1]):
+        validate_policy_meta(valid_meta)
+
+
+def test_joint_names_must_be_strings(valid_meta):
+    valid_meta['joint_names'][3] = 7
+    with pytest.raises(PolicyMetaError, match='joint_names'):
+        validate_policy_meta(valid_meta)
+
+
+def test_default_joint_pos_must_be_finite_numbers(valid_meta):
+    valid_meta['default_joint_pos'][2] = '0.8'
+    with pytest.raises(PolicyMetaError, match='default_joint_pos'):
+        validate_policy_meta(valid_meta)
+
+
+@pytest.mark.parametrize('path, value', [
+    (('command_ranges', 'lin_vel_x'), 0.8),
+    (('materials',), ['ground', 'robot']),
+    (('obs_terms',), {'name': 'x'}),
+    (('actuator',), 'DCMotor'),
+])
+def test_malformed_containers_are_policy_meta_errors(valid_meta, path, value):
+    target = valid_meta
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+    with pytest.raises(PolicyMetaError, match=path[-1]):
+        validate_policy_meta(valid_meta)
+
+
+def test_positive_clip_actions_is_allowed(valid_meta):
+    valid_meta['clip_actions'] = 100.0
+    validate_policy_meta(valid_meta)

@@ -14,6 +14,10 @@ def make_eval_env_cfg(num_envs, episode_length_s=1000.0):
     cmd.rel_standing_envs = 0.0
     cmd.rel_small_envs = 0.0
     cmd.debug_vis = False
+    # the nominal robot: play_mode keeps the startup base-mass and CoM randomization
+    cfg.events.add_base_mass = None
+    cfg.events.base_com = None
+    cfg.seed = 42
     # spawn exactly at the env origin, standing pose, at rest
     cfg.events.reset_base.params["pose_range"] = {}
     cfg.events.reset_base.params["velocity_range"] = {}

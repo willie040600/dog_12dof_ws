@@ -67,6 +67,16 @@ def test_eval_env_cfg_is_deterministic():
     assert cfg.observations.policy.enable_corruption is False
 
 
+def test_eval_env_cfg_uses_the_nominal_robot():
+    # play_mode keeps the startup mass/CoM randomization; eval and the plan 2 parity test need the URDF robot
+    from robot_dog_lab.eval_env import make_eval_env_cfg
+
+    cfg = make_eval_env_cfg(17)
+    assert cfg.events.add_base_mass is None
+    assert cfg.events.base_com is None
+    assert cfg.seed == 42
+
+
 def test_timing_and_action_scale():
     cfg = RobotDogFlatEnvCfg()
     assert cfg.sim.dt == pytest.approx(0.005)
