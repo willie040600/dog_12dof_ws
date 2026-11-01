@@ -1,6 +1,7 @@
 # Starting values for an RL task (Isaac Lab / legged_gym / MuJoCo).
-# Joint order matches ros2_controllers.yaml, so a trained policy maps 1:1
-# onto joint_group_* controllers on the ROS 2 side.
+# joint_order below is the ROS 2 controller order (ros2_controllers.yaml). Isaac Lab orders the
+# policy's joints differently (all hips, then thighs, then calves); the exported policy.json lists
+# that order, so map joints by name, never by index.
 urdf: urdf/robot_dog_rl.urdf
 base_link: base_link
 foot_bodies: [FL_calf, FR_calf, RL_calf, RR_calf]   # foot sphere is a collision of the calf

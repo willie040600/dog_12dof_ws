@@ -91,6 +91,33 @@ uv run --extra isaacsim python $S/gait_eval.py --policy_dir ~/dog_12dof_ws/robot
 uv run --extra isaacsim python $S/stand_test.py
 ```
 
+## 目前採用的策略
+
+`robot_dog_description/isaac/policies/2026-11-01_20-43-36_v7/`（`model_2450.pt`），`gait_eval` **17/17**：
+
+| 情境 | 指令 | 實際 |
+|---|---|---|
+| 前後 | ±0.1 / ±0.3 / ±0.5 m/s | +0.097 −0.101 / +0.312 −0.309 / +0.520 −0.508 |
+| 側移 | ±0.1 / ±0.3 m/s | +0.086 −0.099 / +0.321 −0.319 |
+| 轉向 | ±0.2 / ±0.5 / ±0.8 rad/s | +0.224 −0.183 / +0.535 −0.526 / +0.824 −0.780 |
+| 站立 | 0，10 秒 | 漂移 0.009 m |
+| 跌倒 | — | 0 |
+
+實際的訓練過程（每一版都從上一版接著訓練 1000 iterations，每次只改一件事）：
+
+| 版本 | 改了什麼 | 結果 |
+|---|---|---|
+| v4 | 從頭訓練；armature 0.01、std 0.5、`feet_air_time` 門檻 0.2 s | 會走，但 ±0.1 m/s 站著不動 |
+| v5 | std 0.25 | 0.3～0.5 更準，死區還在 |
+| v6 | `feet_air_time_any_motion`（抬腳獎勵也看小指令與轉向） | 死區還在 |
+| v7 | 25% 單一軸小指令（`RobotDogVelocityCommand`） | 17/17；21 個 checkpoint 中 13 個 17/17，取平均相對誤差最小的 `model_2450` |
+
+用目前的設定從頭重現：照上面「訓練」一節的兩階段指令（第 1 階段 std 0.5）。這條路徑本身還沒有完整跑過一次，
+重訓後請用 `gait_eval` 確認；要挑同一個 run 裡最好的 checkpoint，可以每個都匯出到暫存資料夾再評估。
+
+策略的關節順序（`policy.json` 的 `joint_names`）是 **4 個 hip → 4 個 thigh → 4 個 calf**（FL、FR、RL、RR），
+不是 ROS 控制器的「每條腿 hip/thigh/calf」順序，所以 Isaac Sim / ROS 端一律依名稱對應。
+
 ## 任務內容
 
 - 觀測（48 維）：機身線速度、角速度、重力方向、速度指令 (vx, vy, wz)、12 個關節角度與速度、上一步動作。
@@ -102,6 +129,8 @@ uv run --extra isaacsim python $S/stand_test.py
   - `feet_air_time` 門檻 0.5 → 0.2 s：這隻狗每步騰空不到 0.5 s，預設值會讓每一步都扣分，策略學成站著不動
   - `feet_air_time` 改成 `feet_air_time_any_motion`（`velocity/mdp.py`）：`|cmd_xy| > 0.05` 或 `|wz| > 0.05` 就給抬腳獎勵；
     Isaac Lab 原版只看 `|cmd_xy| > 0.1`，0.1 m/s 和原地轉向的指令因此學成站著不動
+  - 指令取樣 `RobotDogVelocityCommand`（`velocity/mdp.py`）：25% 的環境改給單一軸的小指令（vx/vy 0.05～0.2 m/s 或 wz 0.1～0.3 rad/s）；
+    只用均勻取樣時，(0.1, 0, 0) 這種指令只會在站立環境附近出現，策略會把它當成「站著」
 - 馬達加了 armature 0.01 kg·m²（減速馬達的轉子等效慣量）。沒有它時，腿很輕、dt 0.005 s 下的 PD 會數值發散，
   腳一離地關節速度就爆掉。
 - 馬達（25 N·m、30 rad/s）與質量都是暫定值，換成實際規格後再訓練。

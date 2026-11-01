@@ -114,6 +114,11 @@
      run v4 對 ±0.1 指令完全站著不動。從頭訓練用 0.25 不易學會走，所以分兩階段：
      **第 1 階段**從頭訓練，命令列覆寫 std=0.5；**第 2 階段**從第 1 階段的 checkpoint 用預設 0.25 再訓練 1000 iterations。
      `feet_air_time` 的 `threshold` 從 0.5 s 改成 **0.2 s**：這隻狗每步的騰空時間短於 0.5 s，預設值會讓每一步都扣分（run v1–v2）。
+     `feet_air_time` 的指令門檻也改掉：Isaac Lab 只在 `|cmd_xy| > 0.1` 時給抬腳獎勵，0.1 m/s 和原地轉向的指令因此
+     學成站著不動（run v4–v5）。改用 `robot_dog_lab` 的 `feet_air_time_any_motion`：`|cmd_xy| > 0.05` **或** `|wz| > 0.05` 就給。
+     指令取樣改用 `RobotDogVelocityCommand`：Isaac Lab 的均勻取樣之外，**25%** 重新取樣的環境改給單一軸的小指令
+     （vx 或 vy 0.05–0.2 m/s，或 wz 0.1–0.3 rad/s，正負隨機，其他兩軸 0）。均勻取樣幾乎不會出現 (0.1, 0, 0)，
+     vy = wz = 0 的指令只有站立環境的 0，策略因此把小指令當成站立（run v4–v6）。
   2. `commands.base_velocity.rel_standing_envs` 從 0.02 調成 **0.1**，讓策略學會零指令時站穩不踏步。
   3. 指令範圍維持 vx ±0.8、vy ±0.5、wz ±1.0。Nav2 的上限在範圍之內（第 6 節）。
   4. `commands.base_velocity.heading_command` 從 True 改成 **False**：wz 直接均勻取樣，和 Nav2 直接送 wz 的用法相同
