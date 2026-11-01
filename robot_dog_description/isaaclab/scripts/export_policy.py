@@ -104,6 +104,7 @@ def build_meta(env_cfg, agent_cfg, uenv):
         "sim_dt": float(env_cfg.sim.dt),
         "decimation": int(env_cfg.decimation),
         "actuator": {"type": "DCMotor", "stiffness": float(legs.stiffness), "damping": float(legs.damping),
+                     "armature": float(legs.armature),
                      "effort_limit": float(legs.actuator_effort_limit),
                      "saturation_effort": float(legs.saturation_effort),
                      "velocity_limit": float(legs.actuator_velocity_limit)},

@@ -105,7 +105,9 @@
   `velocity_commands`(3: vx, vy, wz)、`joint_pos_rel`(12)、`joint_vel_rel`(12)、`last_action`(12)。
   訓練時有 Isaac Lab 預設的觀測雜訊，部署時不加。
 - **動作**：12 維，`關節目標 = 預設站姿 + 0.25 × action`。站姿：hip 0、thigh 0.8、calf −1.5 rad。
-- **致動器**：`DCMotorCfg`，effort 25 N·m、saturation 25 N·m、速度 30 rad/s、kp 20、kd 0.5（現有設定）。
+- **致動器**：`DCMotorCfg`，effort 25 N·m、saturation 25 N·m、速度 30 rad/s、kp 20、kd 0.5，**armature 0.01 kg·m²**。
+  armature 是減速馬達轉子的等效慣量；沒有它時，這個逐步明確計算的 PD 在輕的小腿（I ≈ 1.3e-3 kg·m²）、dt 0.005 s 下
+  會數值發散（固定機身、零動作 2 秒內關節速度到 1e11 rad/s），腳一離地就發散。
 - **物理**：sim dt 0.005 s、decimation 4（策略 50 Hz），PhysX，solver 4/0，關閉自碰撞，地面摩擦 1.0。
 - **要改的四處：**
   1. 速度追蹤獎勵的 `std` **維持 Isaac Lab 預設 0.5**（原本想調成 0.25 讓低速追得更準；run v1 用 0.25 時策略只學會站著，
@@ -150,7 +152,7 @@
   "obs_terms": [{"name": "base_lin_vel", "dim": 3, "scale": null, "clip": null}],
   "sim_dt": 0.005,
   "decimation": 4,
-  "actuator": {"type": "DCMotor", "stiffness": 20.0, "damping": 0.5,
+  "actuator": {"type": "DCMotor", "stiffness": 20.0, "damping": 0.5, "armature": 0.01,
                "effort_limit": 25.0, "saturation_effort": 25.0, "velocity_limit": 30.0},
   "physx": {"solver_position_iterations": 4, "solver_velocity_iterations": 0, "self_collisions": false},
   "materials": {
@@ -211,7 +213,8 @@ cd ~/IsaacLab && uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_descrip
 ### 5.2 物理與控制迴圈
 
 - 物理 dt、decimation、solver iterations、自碰撞、地面材質都**從 `policy.json` 讀取**。
-- 匯入時關節驅動 stiffness/damping 設為 0，改為力矩控制。
+- 匯入時關節驅動 stiffness/damping 設為 0，改為力矩控制；每個關節的 armature 設成 `actuator.armature`
+  （PhysX joint armature，和 Isaac Lab 相同），否則抬腳時會數值發散。
 - **physics step callback**（200 Hz）：
   - 每 `decimation` 步：讀 articulation 狀態 → `observations.py` 組 48 維觀測 → `policy.pt` 推論 →
     `q_target = default + action_scale × action`，記錄 `last_action`。

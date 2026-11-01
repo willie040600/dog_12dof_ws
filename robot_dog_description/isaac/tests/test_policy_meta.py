@@ -24,7 +24,7 @@ def valid_meta():
         'obs_terms': [{'name': n, 'dim': d, 'scale': None, 'clip': None} for n, d in terms],
         'sim_dt': 0.005,
         'decimation': 4,
-        'actuator': {'type': 'DCMotor', 'stiffness': 20.0, 'damping': 0.5,
+        'actuator': {'type': 'DCMotor', 'stiffness': 20.0, 'damping': 0.5, 'armature': 0.01,
                      'effort_limit': 25.0, 'saturation_effort': 25.0, 'velocity_limit': 30.0},
         'physx': {'solver_position_iterations': 4, 'solver_velocity_iterations': 0, 'self_collisions': False},
         'materials': {
@@ -76,6 +76,19 @@ def test_duplicate_joint_names(valid_meta):
 def test_bad_actuator_type(valid_meta):
     valid_meta['actuator']['type'] = 'IdealPD'
     with pytest.raises(PolicyMetaError, match='DCMotor'):
+        validate_policy_meta(valid_meta)
+
+
+def test_armature_is_required(valid_meta):
+    # without armature the explicit PD diverges on the light legs, so the Isaac Sim side must set it
+    del valid_meta['actuator']['armature']
+    with pytest.raises(PolicyMetaError, match='armature'):
+        validate_policy_meta(valid_meta)
+
+
+def test_negative_armature_rejected(valid_meta):
+    valid_meta['actuator']['armature'] = -0.01
+    with pytest.raises(PolicyMetaError, match='armature'):
         validate_policy_meta(valid_meta)
 
 

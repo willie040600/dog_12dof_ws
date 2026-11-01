@@ -62,6 +62,9 @@ ROBOT_DOG_CFG = ArticulationCfg(
             stiffness=20.0,
             damping=0.5,
             friction=0.0,
+            # reflected rotor inertia (kg m^2, typical of a geared leg motor, as in Isaac Lab's Unitree configs);
+            # without it this explicit PD diverges on the light calves (I ~1.3e-3) at dt 0.005
+            armature=0.01,
         ),
     },
 )

@@ -19,6 +19,13 @@ def test_tracking_reward_std():
     assert r.track_ang_vel_z_exp.params["std"] == pytest.approx(0.5)
 
 
+def test_legs_have_armature():
+    # without it the explicit DC-motor PD diverges on the light legs (dt 0.005, calf I ~1.3e-3 kg m^2)
+    from robot_dog_lab.assets.robot_dog import ROBOT_DOG_CFG
+
+    assert ROBOT_DOG_CFG.actuators["legs"].armature == pytest.approx(0.01)
+
+
 def test_feet_air_time_rewards_short_steps():
     # this dog's swing is ~0.2-0.3 s; Isaac Lab's 0.5 s made every step a penalty (runs v1, v2 stood still)
     assert RobotDogFlatEnvCfg().rewards.feet_air_time.params["threshold"] == pytest.approx(0.2)

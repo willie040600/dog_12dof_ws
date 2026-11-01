@@ -70,15 +70,16 @@ def validate_policy_meta(meta, policy_input_dim=None, policy_output_dim=None):
         raise PolicyMetaError('decimation must be an int >= 1')
 
     act = meta['actuator']
-    _require(act, ('type', 'stiffness', 'damping', 'effort_limit', 'saturation_effort', 'velocity_limit'),
-             'actuator')
+    _require(act, ('type', 'stiffness', 'damping', 'armature', 'effort_limit', 'saturation_effort',
+                   'velocity_limit'), 'actuator')
     if act['type'] != 'DCMotor':
         raise PolicyMetaError('actuator.type is %r, only DCMotor is supported' % act['type'])
     for k in ('stiffness', 'effort_limit', 'saturation_effort', 'velocity_limit'):
         if not _is_number(act[k]) or act[k] <= 0:
             raise PolicyMetaError('actuator.%s must be > 0' % k)
-    if not _is_number(act['damping']) or act['damping'] < 0:
-        raise PolicyMetaError('actuator.damping must be >= 0')
+    for k in ('damping', 'armature'):
+        if not _is_number(act[k]) or act[k] < 0:
+            raise PolicyMetaError('actuator.%s must be >= 0' % k)
 
     _require(meta['physx'], _PHYSX_KEYS, 'physx')
     _require(meta['materials'], ('ground', 'robot'), 'materials')
