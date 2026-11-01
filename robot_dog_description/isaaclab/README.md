@@ -6,7 +6,10 @@
 isaaclab/
 ├── scripts/
 │   ├── train.py                             # 註冊任務後呼叫 Isaac Lab 的 train CLI
-│   └── play.py                              # 回放
+│   ├── play.py                              # 回放
+│   ├── stand_test.py                        # 零動作站立測試
+│   ├── export_policy.py                     # 匯出 policy.pt + policy.json
+│   └── gait_eval.py                         # 依 spec 4.3 評估
 ├── robot_dog_lab/
 │   ├── assets/robot_dog.py                  # ROBOT_DOG_CFG（URDF、馬達模型、站姿）
 │   ├── data/robot_dog/{urdf,meshes}/        # robot_dog_rl.urdf + STL
@@ -46,6 +49,40 @@ uv run --extra isaacsim python $S/train.py --task RobotDog-Velocity-Flat --check
 
 ```bash
 uv run --extra isaacsim python $S/play.py --task RobotDog-Velocity-Flat --checkpoint <run 資料夾>/model_<N>.pt --viz kit
+```
+
+## 匯出（給 Isaac Sim 導航模式用）
+
+```bash
+uv run --extra isaacsim python $S/export_policy.py --run_dir ~/IsaacLab/logs/rsl_rl/robot_dog_flat/<run 資料夾>
+```
+
+- 輸出到 `robot_dog_description/isaac/policies/<run 資料夾>/`：`policy.pt`（TorchScript）+ `policy.json`
+  （關節順序、站姿、觀測項目、物理、馬達、摩擦材質，全部從實際的環境設定讀出，格式見 spec 第 4.4 節）。
+- 預設用編號最大的 `model_<N>.pt`；`--checkpoint model_500.pt` 指定其他的；`--out <資料夾>` 改輸出位置。
+- 輸出資料夾已有檔案時會拒絕（避免覆蓋已提交的策略），要覆蓋加 `--force`。
+- 會檢查：動作項剛好涵蓋 12 個關節各一次、TorchScript 與訓練時的推論輸出相同（誤差 < 1e-5）、`policy.json` 通過格式檢查。
+
+## 評估
+
+```bash
+uv run --extra isaacsim python $S/gait_eval.py --policy_dir ~/dog_12dof_ws/robot_dog_description/isaac/policies/<run 資料夾>
+```
+
+17 個情境同時跑（每個一個環境、指令固定、沒有推力與雜訊）：暖身 2 秒後量 5 秒平均速度。全部通過時 exit 0。
+
+| 項目 | 指令 | 通過 |
+|---|---|---|
+| 前後 | vx ∈ {±0.1, ±0.3, ±0.5} | \|誤差\| < 0.1 m/s |
+| 側移 | vy ∈ {±0.1, ±0.3} | \|誤差\| < 0.1 m/s |
+| 轉向 | wz ∈ {±0.2, ±0.5, ±0.8} | \|誤差\| < 0.15 rad/s |
+| 站立 | 0 指令 10 秒 | 水平漂移 < 0.1 m |
+| 全程 | — | 沒有跌倒 |
+
+站立測試（零動作 5 秒，16 隻機身高度都在 0.20～0.28 m、沒有倒下）：
+
+```bash
+uv run --extra isaacsim python $S/stand_test.py
 ```
 
 ## 任務內容
