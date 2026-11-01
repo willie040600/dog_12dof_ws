@@ -33,6 +33,10 @@ class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.commands.base_velocity.ranges.lin_vel_x = (-0.8, 0.8)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
+        # Nav2 sends wz directly, so sample it instead of deriving it from a heading error
+        self.commands.base_velocity.heading_command = False
+        # learn to stand still on a zero command instead of stepping in place
+        self.commands.base_velocity.rel_standing_envs = 0.1
 
         # rewards: the foot sphere is a collision of the calf link
         self.rewards.feet_air_time.params["sensor_cfg"].body_names = ".*_calf"
@@ -40,6 +44,9 @@ class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.undesired_contacts.params["sensor_cfg"].body_names = ".*_thigh"
         self.rewards.track_lin_vel_xy_exp.weight = 1.5
         self.rewards.track_ang_vel_z_exp.weight = 0.75
+        # narrower than Isaac Lab's 0.5 so the small commands Nav2 sends (0.05-0.2) are still worth tracking
+        self.rewards.track_lin_vel_xy_exp.params["std"] = 0.25
+        self.rewards.track_ang_vel_z_exp.params["std"] = 0.25
         self.rewards.dof_torques_l2.weight = -0.0002
         self.rewards.dof_acc_l2.weight = -2.5e-7
         self.rewards.flat_orientation_l2.weight = -2.5

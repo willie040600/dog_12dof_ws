@@ -204,7 +204,9 @@ sudo apt install -y ros-jazzy-joint-state-topic-hardware-interface
 
 ### Isaac Lab 3.0：平地速度追蹤任務 `RobotDog-Velocity-Flat`
 
-`isaaclab/robot_dog_lab/` 是放進 Isaac Lab 3.0 外部專案的檔案：
+`isaaclab/robot_dog_lab/` 是任務本身，`isaaclab/scripts/*.py` 直接 import 它，
+在 `~/IsaacLab` 的 uv 環境執行（不另建 Isaac Lab 外部專案，以免再裝一份 Isaac Sim）。
+詳細步驟見 [isaaclab/README.md](isaaclab/README.md)。
 
 | 檔案 | 內容 |
 |---|---|
@@ -217,23 +219,13 @@ sudo apt install -y ros-jazzy-joint-state-topic-hardware-interface
 致動器欄位是 `actuator_effort_limit` / `actuator_velocity_limit`、
 物理後端預設 `isaacsim_physx`，也可用 `physics=newton_mjwarp`。
 
-1. 在 Isaac Lab 原始碼目錄產生外部專案（預設內容會帶 rsl_rl 相依）：
-   ```bash
-   cd ~/IsaacLab
-   uv run isaaclab --new --non_interactive --project_path ~/projects --name robot_dog_lab --author willie
-   ```
-2. 把本套件的檔案複製進去（專案名稱必須是 `robot_dog_lab`，import 才對得上）：
-   ```bash
-   cp -r ~/ros2_ws/src/robot_dog_description/isaaclab/robot_dog_lab/* ~/projects/robot_dog_lab/src/robot_dog_lab/
-   ```
-3. 確認任務有註冊、開始訓練、回放：
-   ```bash
-   cd ~/projects/robot_dog_lab
-   uv run --extra isaacsim isaaclab list_envs --show_presets
-   uv run --extra isaacsim isaaclab train --rl_library rsl_rl --task RobotDog-Velocity-Flat
-   uv run --extra isaacsim isaaclab play --rl_library rsl_rl --task RobotDog-Velocity-Flat --checkpoint latest --viz kit
-   ```
-   不裝 Isaac Sim、只用 Newton：`uv run --extra importers isaaclab train --rl_library rsl_rl --task RobotDog-Velocity-Flat physics=newton_mjwarp`
+```bash
+cd ~/IsaacLab && export OMNI_KIT_ACCEPT_EULA=yes PYTHONUNBUFFERED=1
+uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaaclab/scripts/train.py --task RobotDog-Velocity-Flat --run_name v1
+```
+
+和 Isaac Lab 預設的速度追蹤任務相比，為了配合 Nav2 改了：`heading_command=False`（wz 直接取樣）、
+零指令環境 10%、速度追蹤獎勵 `std` 0.25（低速也追得準）。
 
 目前只做平地任務。崎嶇地形需要高度掃描器掛在 `base_link` 上，
 而 Isaac Sim 6 匯入後的連桿位在 `Geometry/` 之下，路徑要先在你的環境確認，所以先不放。
