@@ -6,6 +6,8 @@ from isaaclab_tasks.core.velocity.velocity_env_cfg import LocomotionVelocityRoug
 
 from robot_dog_lab.assets.robot_dog import ROBOT_DOG_CFG
 
+from .mdp import feet_air_time_any_motion
+
 
 @configclass
 class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
@@ -44,6 +46,8 @@ class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         # reward = air time - threshold per touchdown; Isaac Lab's 0.5 s (Go1-sized) turned every step of
         # this smaller dog into a penalty, and runs v1/v2 learned to stand still
         self.rewards.feet_air_time.params["threshold"] = 0.2
+        # Isaac Lab's gate (|cmd_xy| > 0.1) never pays for steps on 0.1 m/s or turn-in-place commands
+        self.rewards.feet_air_time.func = feet_air_time_any_motion
         self.rewards.undesired_contacts.params["sensor_cfg"].body_names = ".*_thigh"
         self.rewards.track_lin_vel_xy_exp.weight = 1.5
         self.rewards.track_ang_vel_z_exp.weight = 0.75

@@ -32,6 +32,15 @@ def test_feet_air_time_rewards_short_steps():
     assert RobotDogFlatEnvCfg().rewards.feet_air_time.params["threshold"] == pytest.approx(0.2)
 
 
+def test_feet_air_time_uses_any_motion_gate():
+    # Isaac Lab's gate ignores wz and |cmd_xy| <= 0.1, which left a dead zone (v4, v5)
+    from robot_dog_lab.tasks.locomotion.velocity.mdp import feet_air_time_any_motion
+
+    term = RobotDogFlatEnvCfg().rewards.feet_air_time
+    assert term.func is feet_air_time_any_motion
+    assert term.params["sensor_cfg"].body_names == ".*_calf"
+
+
 def test_eval_env_cfg_is_deterministic():
     from robot_dog_lab.eval_env import make_eval_env_cfg
 
