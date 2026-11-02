@@ -121,10 +121,10 @@
      vy = wz = 0 的指令只有站立環境的 0，策略因此把小指令當成站立（run v4–v6）。
   2. `commands.base_velocity.rel_standing_envs` 從 0.02 調成 **0.1**，讓策略學會零指令時站穩不踏步。
   3. 指令範圍維持 vx ±0.8、vy ±0.5、wz ±1.0。Nav2 的上限在範圍之內（第 6 節）。
-  5. 新增 `base_height_l2`（目標 **0.23 m**，權重 **−50**）：沒有高度獎勵時，策略學成壓低機身、腹部離地 4–5 cm 趴著爬
-     （run v7，機身約 0.09 m；計畫 2 一致性測試時發現）。v8 = v7 加這一項接著訓練，站高約 0.226 m。
   4. `commands.base_velocity.heading_command` 從 True 改成 **False**：wz 直接均勻取樣，和 Nav2 直接送 wz 的用法相同
      （Isaac Lab 預設是由航向誤差算出 wz）。
+  5. 新增 `base_height_l2`（目標 **0.23 m**，權重 **−50**）：沒有高度獎勵時，策略學成壓低機身、腹部離地 4–5 cm 趴著爬
+     （run v7，機身約 0.09 m；計畫 2 一致性測試時發現）。v8 = v7 加這一項接著訓練，站高約 0.226 m。
 - 領域隨機化保留 Isaac Lab 預設（摩擦、機身質量、推力、外力）。
 - PPO：現有 `rsl_rl_ppo_cfg.py`（128×3 MLP），4096 個環境、1000 iterations。
 
