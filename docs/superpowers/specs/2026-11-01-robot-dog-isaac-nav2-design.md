@@ -279,12 +279,12 @@ robot_dog_navigation/
 │   ├── odom_footprint_node.py
 │   ├── scan_ground_filter_node.py
 │   ├── footprint_math.py       姿態分解（純函式）
-│   └── ground_filter_math.py   打地距離幾何（純函式）
+│   ├── ground_filter_math.py   打地距離幾何（純函式）
+│   └── nav_eval.py / nav_goals.py / map_check.py / check_map.py   M4、M5 評估（console scripts）
 ├── launch/nav.launch.py
 ├── config/nav2_params.yaml     Nav2 + slam_toolbox + amcl
 ├── maps/                       map_saver_cli 存的地圖
 ├── rviz/nav.rviz
-├── scripts/nav_eval.py
 └── test/                       pytest
 ```
 
@@ -372,8 +372,8 @@ scan_ground_filter）、`nav2_bringup/bringup_launch.py`（slam_toolbox 或 map_
    計畫 2 留給計畫 3 的事項（2026-11-02 計畫 2 結案時記錄）：
    - 導航模式在筆電上的即時率還沒量（headless、有無相機）；調 Nav2 與 teleop 前先量，0.5 s 指令逾時是 sim time。
    - `robot_dog_nav_sim.py` 每個循環只處理一則 `/cmd_vel`（`spin_once`），指令頻率高於模擬循環時可能延遲；
-     `scan_ground_filter` 查 TF 時會等 50 ms（`TransformListener` 沒開 spin thread）。
-   - `world.py` 的 `INNER_WALLS`、`BOXES`、`CYLINDERS` 是 `nav_eval` 目標點要避開的障礙物座標。
+     `scan_ground_filter` 查 TF 時會等 50 ms（`TransformListener` 沒開 spin thread）。（計畫 3 已處理：循環最多處理 20 則；TF 改用獨立節點，不再等待）
+   - `world.py` 的 `INNER_WALLS`、`BOXES`、`CYLINDERS` 是 `nav_eval` 目標點要避開的障礙物座標。（計畫 3 已移到 `robot_dog_sim/room_layout.py`，world.py、nav_goals、map_check 共用）
 3. **計畫 3：M4 + M5**：slam_toolbox、AMCL、Nav2 參數、RViz、`nav_eval`。
    結果（2026-11-02 計畫 3 結案時記錄，v8 策略，headless、`--no-camera`，即時率約 0.58）：
    - M4：`nav_eval --slam` 帶狗繞完三個區域後存圖，`check_map`：2726 個佔據格，對齊率 0.999、外牆覆蓋率 1.000。
@@ -381,7 +381,7 @@ scan_ground_filter）、`nav2_bringup/bringup_launch.py`（slam_toolbox 或 map_
    - M5 AMCL：PASS 5/5，初始定位誤差 0.025 m，終點距離 0.06 / 0.12 / 0.19 / 0.18 / 0.13 m，
      到達時定位誤差 0.04–0.13 m，單一目標最久 65.9 s。
    - 到不了的目標（箱子中心）：120 s 逾時判 FAIL，`nav_eval` 正常結束。Nav2 有時會停在最近的可達點並回報
-     SUCCEEDED，所以 `nav_eval` 一律用 `/odom_gt` 真值判定。
+     SUCCEEDED，所以 Nav2 回報 SUCCEEDED 後 `nav_eval` 還要用 `/odom_gt` 真值檢查距離與角度。
    - goal checker 原本 0.20 m 時，AMCL 一次在 "east zone north" 以真值 0.32 m 失敗（Nav2 認為到了，定位誤差加上
      容許值超過 0.25 m）；改成 0.10 m 後通過。之後若 AMCL 模式偶爾失敗，下一步是降低 AMCL 的 `alpha1`～`alpha5`
      （里程計是真值，預設 0.2 太悲觀）。

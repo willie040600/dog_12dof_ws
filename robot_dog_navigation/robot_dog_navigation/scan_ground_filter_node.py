@@ -10,6 +10,7 @@ import math
 import numpy as np
 import rclpy
 import rclpy.parameter
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
@@ -66,9 +67,11 @@ def main():
     node = ScanGroundFilter()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
+        node.tl.unregister()  # stop the TF spin thread before rclpy shuts down (else a traceback at exit)
+        node.tf_node.destroy_node()
         node.destroy_node()
         rclpy.try_shutdown()
 

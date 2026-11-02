@@ -8,6 +8,7 @@ unreachable goal is given up on instead of hanging).
 import argparse
 import math
 import sys
+import time
 
 import rclpy
 from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped
@@ -62,7 +63,8 @@ def check_localization(nav, truth, buf):
     """AMCL mode: map->base_footprint must start at the true pose; re-seed it at the origin when it does not."""
     for attempt in range(2):
         tf = None
-        for _ in range(100):
+        deadline = time.monotonic() + 5.0  # wall clock: spin_once returns after any callback (/clock, /odom_gt)
+        while time.monotonic() < deadline:
             rclpy.spin_once(nav, timeout_sec=0.05)
             try:
                 tf = buf.lookup_transform('map', 'base_footprint', Time())
@@ -94,7 +96,10 @@ def localization_error(buf, truth):
 
 def run_goal(nav, truth, goal, timeout, buf):
     name, x, y, yaw = goal
-    nav.goToPose(make_pose(nav, x, y, yaw))
+    if not nav.goToPose(make_pose(nav, x, y, yaw)):
+        # a rejected goal leaves BasicNavigator's result future on the previous goal, so do not poll it
+        print('[NAV] %-34s FAIL goal rejected by Nav2' % name, flush=True)
+        return False
     t0, fell, timed_out = sim_seconds(nav), False, False
     while not nav.isTaskComplete():
         if truth.pose is not None and truth.pose[2] < FALL_HEIGHT and not fell:

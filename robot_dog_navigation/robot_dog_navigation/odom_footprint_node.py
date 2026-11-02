@@ -9,6 +9,7 @@ Ported from the 8-DOF dog (~/robotdog_ws/dog_gait/dog_gait/odom_footprint_node.p
 import rclpy
 from geometry_msgs.msg import TransformStamped
 from nav_msgs.msg import Odometry
+from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from tf2_ros import TransformBroadcaster
 
@@ -64,7 +65,7 @@ def main():
     node = OdomFootprintNode()
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:
         node.destroy_node()

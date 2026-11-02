@@ -31,7 +31,7 @@ AMCL 的初始位置設在原點；若 Isaac Sim 不是剛啟動（狗不在原�
 
 存圖（SLAM 模式繞完房間後）與檢查：
 ```bash
-ros2 run nav2_map_server map_saver_cli -f robot_dog_navigation/maps/robot_dog_room --ros-args -p use_sim_time:=true
+ros2 run nav2_map_server map_saver_cli -f robot_dog_navigation/maps/robot_dog_room   # 不要加 use_sim_time（會逾時）
 ros2 run robot_dog_navigation check_map robot_dog_navigation/maps/robot_dog_room.yaml
 ```
 `check_map` 把佔據格子和 `robot_dog_sim/room_layout.py` 的牆與障礙物比對：對齊率（0.10 m 內）≥ 0.95、外牆覆蓋率 ≥ 0.80 才通過。
@@ -55,7 +55,7 @@ ros2 run robot_dog_navigation nav_eval --extra-goal=-3.3,1.0,0.0   # 多送一�
 
 - 地圖 `maps/robot_dog_room`：2726 個佔據格，對齊率 0.999、外牆覆蓋率 1.000。
 - 到不了的目標（箱子中心 −3.3, 1.0）：120 s 逾時判 FAIL，程式正常結束。Nav2 有時會在最近的可達點回報 SUCCEEDED，
-  所以判定一律用真值，不看 Nav2 的狀態。
+  所以 Nav2 回報 SUCCEEDED 之後還要用真值檢查距離與角度；Nav2 回報失敗、被拒絕或逾時都直接判 FAIL。
 
 ## 節點與參數
 
