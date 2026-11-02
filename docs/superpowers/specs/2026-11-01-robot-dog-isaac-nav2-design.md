@@ -300,19 +300,21 @@ robot_dog_navigation/
 
 ### 6.3 定位與建圖
 
-- `slam:=True`：slam_toolbox online async，mapping 模式，`base_frame: base_footprint`、`odom_frame: odom`、
+- `slam:=True`：slam_toolbox（nav2_bringup 的 `slam_launch.py` 啟動 sync 節點），mapping 模式，`base_frame: base_footprint`、`odom_frame: odom`、
   `scan_topic: /scan_filtered`，解析度 0.05 m。
 - `slam:=False`：map_server（`map:=` 參數，預設 `maps/robot_dog_room.yaml`）+ amcl，
   `robot_model_type: nav2_amcl::OmniMotionModel`，初始位置設在原點，`scan_topic: /scan_filtered`。
+- LiDAR 量程 0.15–15 m（Isaac Sim 導航模式覆寫 RTX 設定檔預設的 1.0 m 近距離盲區）；AMCL 與 slam_toolbox 的最大量程都設 15 m。
 
 ### 6.4 Nav2
 
-用 `nav2_bringup` 的 `navigation_launch.py`，參數檔從 Jazzy 預設複製後修改：
+用 `nav2_bringup` 的 `bringup_launch.py`，參數檔由 `config/make_nav2_params.py` 從 Jazzy 預設產生：
 
 | 項目 | 設定 |
 |---|---|
 | planner | NavFn |
-| controller | MPPI，`motion_model: Omni`，vx −0.3～0.5、vy ±0.3、wz ±0.8，20 Hz |
+| controller | MPPI，`motion_model: Omni`，vx −0.3～0.5、vy ±0.3、wz ±0.8，20 Hz，加 TwirlingCritic |
+| goal checker | xy 0.10 m、yaw 0.25 rad（比 M5 的 0.25 m 緊，留給定位誤差） |
 | velocity_smoother | 同上限，加速度 vx/vy 1.0 m/s²、wz 2.0 rad/s²，`deadband_velocity` 全 0 |
 | footprint | 多邊形 `[[0.22, 0.16], [0.22, -0.16], [-0.22, -0.16], [-0.22, 0.16]]` |
 | inflation | 0.35 m |
@@ -335,8 +337,8 @@ ros2 launch robot_dog_navigation nav.launch.py slam:=True rviz:=true
 | `params_file` | `config/nav2_params.yaml` | |
 | `rviz` | `true` | |
 
-啟動：robot_state_publisher（`robot_dog.urdf.xacro sim_mode:=none`）、odom_footprint、scan_ground_filter、
-slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 啟動（第 5.1 節），因為它在 Isaac Lab 的 uv 環境執行。
+啟動：`bridge.launch.py`（robot_state_publisher（`robot_dog.urdf.xacro sim_mode:=none`）、odom_footprint、
+scan_ground_filter）、`nav2_bringup/bringup_launch.py`（slam_toolbox 或 map_server + amcl、Nav2）、RViz。Isaac Sim 另外在終端 1 啟動（第 5.1 節），因為它在 Isaac Lab 的 uv 環境執行。
 
 ## 7. 里程碑與驗收
 
@@ -373,6 +375,18 @@ slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 �
      `scan_ground_filter` 查 TF 時會等 50 ms（`TransformListener` 沒開 spin thread）。
    - `world.py` 的 `INNER_WALLS`、`BOXES`、`CYLINDERS` 是 `nav_eval` 目標點要避開的障礙物座標。
 3. **計畫 3：M4 + M5**：slam_toolbox、AMCL、Nav2 參數、RViz、`nav_eval`。
+   結果（2026-11-02 計畫 3 結案時記錄，v8 策略，headless、`--no-camera`，即時率約 0.58）：
+   - M4：`nav_eval --slam` 帶狗繞完三個區域後存圖，`check_map`：2726 個佔據格，對齊率 0.999、外牆覆蓋率 1.000。
+   - M5 SLAM：PASS 5/5，終點距離 0.09 / 0.09 / 0.09 / 0.03 / 0.14 m，到達時定位誤差 0.01–0.06 m，單一目標最久 64.0 s。
+   - M5 AMCL：PASS 5/5，初始定位誤差 0.025 m，終點距離 0.06 / 0.12 / 0.19 / 0.18 / 0.13 m，
+     到達時定位誤差 0.04–0.13 m，單一目標最久 65.9 s。
+   - 到不了的目標（箱子中心）：120 s 逾時判 FAIL，`nav_eval` 正常結束。Nav2 有時會停在最近的可達點並回報
+     SUCCEEDED，所以 `nav_eval` 一律用 `/odom_gt` 真值判定。
+   - goal checker 原本 0.20 m 時，AMCL 一次在 "east zone north" 以真值 0.32 m 失敗（Nav2 認為到了，定位誤差加上
+     容許值超過 0.25 m）；改成 0.10 m 後通過。之後若 AMCL 模式偶爾失敗，下一步是降低 AMCL 的 `alpha1`～`alpha5`
+     （里程計是真值，預設 0.2 太悲觀）。
+   - 實作中發現：`TransformListener(spin_thread=True)` 掛在已經被另一個 executor spin 的節點上會讓 `scan_ground_filter`
+     segfault（同一節點在兩個 executor）；`scan_ground_filter` 與 `nav_eval` 都改用獨立的 TF 節點。
 
 ## 8. 測試
 
