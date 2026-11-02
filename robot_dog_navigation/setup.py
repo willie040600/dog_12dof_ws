@@ -26,6 +26,8 @@ setup(
         'console_scripts': [
             'odom_footprint_node = robot_dog_navigation.odom_footprint_node:main',
             'scan_ground_filter_node = robot_dog_navigation.scan_ground_filter_node:main',
+            'nav_eval = robot_dog_navigation.nav_eval:main',
+            'check_map = robot_dog_navigation.check_map:main',
         ],
     },
 )
