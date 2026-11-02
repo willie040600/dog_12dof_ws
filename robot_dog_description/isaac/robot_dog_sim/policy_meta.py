@@ -15,7 +15,11 @@ class PolicyMetaError(ValueError):
 
 REQUIRED_KEYS = ('task', 'run', 'checkpoint', 'joint_names', 'default_joint_pos', 'action_scale', 'clip_actions',
                  'obs_terms', 'sim_dt', 'decimation', 'actuator', 'physx', 'materials', 'command_ranges',
-                 'spawn_height')
+                 'spawn_height', 'rigid_body', 'physx_scene')
+RIGID_BODY_KEYS = ('max_depenetration_velocity', 'linear_damping', 'angular_damping', 'max_linear_velocity',
+                   'max_angular_velocity')
+PHYSX_SCENE_KEYS = ('solver_type', 'bounce_threshold_velocity', 'friction_offset_threshold',
+                    'friction_correlation_distance', 'enable_stabilization')
 COMBINE_MODES = ('average', 'min', 'multiply', 'max')  # PhysX material combine modes
 
 
@@ -133,6 +137,18 @@ def validate_policy_meta(meta, policy_input_dim=None, policy_output_dim=None):
         if materials['ground'][k] not in COMBINE_MODES:
             raise PolicyMetaError('materials.ground.%s must be one of %s, got %r'
                                   % (k, ', '.join(COMBINE_MODES), materials['ground'][k]))
+
+    _require(meta['rigid_body'], RIGID_BODY_KEYS, 'rigid_body')
+    for k in RIGID_BODY_KEYS:
+        _number(meta['rigid_body'][k], 'rigid_body.%s' % k, 0.0)
+    scene = meta['physx_scene']
+    _require(scene, PHYSX_SCENE_KEYS, 'physx_scene')
+    if scene['solver_type'] not in (0, 1) or isinstance(scene['solver_type'], bool):
+        raise PolicyMetaError('physx_scene.solver_type must be 0 (PGS) or 1 (TGS), got %r' % scene['solver_type'])
+    for k in ('bounce_threshold_velocity', 'friction_offset_threshold', 'friction_correlation_distance'):
+        _number(scene[k], 'physx_scene.%s' % k, 0.0)
+    if not isinstance(scene['enable_stabilization'], bool):
+        raise PolicyMetaError('physx_scene.enable_stabilization must be true or false')
 
     ranges = meta['command_ranges']
     _require(ranges, ('lin_vel_x', 'lin_vel_y', 'ang_vel_z'), 'command_ranges')

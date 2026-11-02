@@ -34,6 +34,10 @@ def valid_meta():
         },
         'command_ranges': {'lin_vel_x': [-0.8, 0.8], 'lin_vel_y': [-0.5, 0.5], 'ang_vel_z': [-1.0, 1.0]},
         'spawn_height': 0.32,
+        'rigid_body': {'max_depenetration_velocity': 1.0, 'linear_damping': 0.0, 'angular_damping': 0.0,
+                       'max_linear_velocity': 1000.0, 'max_angular_velocity': 1000.0},
+        'physx_scene': {'solver_type': 1, 'bounce_threshold_velocity': 0.5, 'friction_offset_threshold': 0.04,
+                        'friction_correlation_distance': 0.025, 'enable_stabilization': False},
     }
 
 
@@ -173,3 +177,29 @@ def test_malformed_containers_are_policy_meta_errors(valid_meta, path, value):
 def test_positive_clip_actions_is_allowed(valid_meta):
     valid_meta['clip_actions'] = 100.0
     validate_policy_meta(valid_meta)
+
+
+@pytest.mark.parametrize('section, key', [
+    ('rigid_body', 'max_depenetration_velocity'), ('rigid_body', 'max_angular_velocity'),
+    ('physx_scene', 'solver_type'), ('physx_scene', 'enable_stabilization'),
+])
+def test_rigid_body_and_physx_scene_required(valid_meta, section, key):
+    del valid_meta[section][key]
+    with pytest.raises(PolicyMetaError, match=key):
+        validate_policy_meta(valid_meta)
+
+
+@pytest.mark.parametrize('key, value', [
+    ('solver_type', 2), ('enable_stabilization', 'no'), ('bounce_threshold_velocity', float('nan')),
+    ('friction_offset_threshold', -0.1),
+])
+def test_physx_scene_values_checked(valid_meta, key, value):
+    valid_meta['physx_scene'][key] = value
+    with pytest.raises(PolicyMetaError, match=key):
+        validate_policy_meta(valid_meta)
+
+
+def test_rigid_body_values_checked(valid_meta):
+    valid_meta['rigid_body']['linear_damping'] = float('inf')
+    with pytest.raises(PolicyMetaError, match='linear_damping'):
+        validate_policy_meta(valid_meta)

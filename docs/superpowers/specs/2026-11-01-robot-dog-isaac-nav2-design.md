@@ -168,7 +168,11 @@
     "robot": {"static_friction": 0.8, "dynamic_friction": 0.6, "restitution": 0.0}
   },
   "command_ranges": {"lin_vel_x": [-0.8, 0.8], "lin_vel_y": [-0.5, 0.5], "ang_vel_z": [-1.0, 1.0]},
-  "spawn_height": 0.32
+  "spawn_height": 0.32,
+  "rigid_body": {"max_depenetration_velocity": 1.0, "linear_damping": 0.0, "angular_damping": 0.0,
+                 "max_linear_velocity": 1000.0, "max_angular_velocity": 1000.0},
+  "physx_scene": {"solver_type": 1, "bounce_threshold_velocity": 0.5, "friction_offset_threshold": 0.04,
+                  "friction_correlation_distance": 0.025, "enable_stabilization": false}
 }
 ```
 

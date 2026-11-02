@@ -89,6 +89,8 @@ def build_meta(env_cfg, agent_cfg, uenv):
     robot_cfg = env_cfg.scene.robot
     legs = robot_cfg.actuators["legs"]
     physx = robot_cfg.spawn.articulation_props[0]
+    rigid = robot_cfg.spawn.rigid_props
+    scene = env_cfg.sim.physics  # the resolved PhysX config (make_eval_env_cfg picks isaacsim_physx)
     ground = env_cfg.scene.terrain.physics_material
     robot_mat = env_cfg.events.physics_material.params
     ranges = env_cfg.commands.base_velocity.ranges
@@ -124,6 +126,14 @@ def build_meta(env_cfg, agent_cfg, uenv):
         "command_ranges": {"lin_vel_x": _pair(ranges.lin_vel_x), "lin_vel_y": _pair(ranges.lin_vel_y),
                            "ang_vel_z": _pair(ranges.ang_vel_z)},
         "spawn_height": float(robot_cfg.init_state.pos[2]),
+        "rigid_body": {k: float(getattr(rigid, k)) for k in ("max_depenetration_velocity", "linear_damping",
+                                                             "angular_damping", "max_linear_velocity",
+                                                             "max_angular_velocity")},
+        "physx_scene": {"solver_type": int(scene.solver_type),
+                        "bounce_threshold_velocity": float(scene.bounce_threshold_velocity),
+                        "friction_offset_threshold": float(scene.friction_offset_threshold),
+                        "friction_correlation_distance": float(scene.friction_correlation_distance),
+                        "enable_stabilization": bool(scene.enable_stabilization)},
     }
 
 
