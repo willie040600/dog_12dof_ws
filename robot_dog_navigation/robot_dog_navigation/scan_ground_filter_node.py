@@ -9,7 +9,6 @@ import math
 
 import numpy as np
 import rclpy
-from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
@@ -24,7 +23,7 @@ class ScanGroundFilter(Node):
         self.fixed_frame = self.declare_parameter('fixed_frame', 'odom').value
         self.min_height = self.declare_parameter('min_height', 0.05).value
         self.buf = Buffer()
-        self.tl = TransformListener(self.buf, self)
+        self.tl = TransformListener(self.buf, self, spin_thread=True)  # TF arrives while a scan is handled
         self.pub = self.create_publisher(LaserScan, 'scan_filtered', 10)
         self.create_subscription(LaserScan, 'scan', self.on_scan, 10)
         self.dropped = 0
@@ -37,8 +36,7 @@ class ScanGroundFilter(Node):
 
     def on_scan(self, msg):
         try:
-            tf = self.buf.lookup_transform(self.fixed_frame, msg.header.frame_id,
-                                           Time.from_msg(msg.header.stamp), Duration(seconds=0.05))
+            tf = self.buf.lookup_transform(self.fixed_frame, msg.header.frame_id, Time.from_msg(msg.header.stamp))
         except TransformException:
             try:
                 tf = self.buf.lookup_transform(self.fixed_frame, msg.header.frame_id, Time())

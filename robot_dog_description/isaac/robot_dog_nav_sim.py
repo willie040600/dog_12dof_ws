@@ -66,11 +66,15 @@ def make_ros_node(buffer, lock):
     from geometry_msgs.msg import Twist
     from nav_msgs.msg import Odometry
 
+    from rclpy.executors import SingleThreadedExecutor
+
     rclpy.init()
     node = rclpy.create_node('robot_dog_nav_sim')
+    executor = SingleThreadedExecutor()
+    executor.add_node(node)
     node.create_subscription(Twist, '/cmd_vel', lambda m: buffer.update(
         (m.linear.x, m.linear.y, m.angular.z), lock.sim_time), 10)
-    return rclpy, node, node.create_publisher(Odometry, '/odom_gt', 10), Odometry
+    return rclpy, node, executor, node.create_publisher(Odometry, '/odom_gt', 10), Odometry
 
 
 def odom_message(Odometry, runner, t):
@@ -124,12 +128,13 @@ def main():
     runner = PolicyRunner(meta, os.path.join(policy_dir, 'policy.pt'), articulation, hold=args.hold)
     apply_policy_dof_settings(articulation, meta, runner.dof_indices)
     buffer = CommandBuffer(meta['command_ranges'])
-    rclpy, node, odom_pub, Odometry = make_ros_node(buffer, lock)
+    rclpy, node, executor, odom_pub, Odometry = make_ros_node(buffer, lock)
     log('running: /cmd_vel in, /odom_gt out')
 
     frames, reported_fall = 0, False
     while simulation_app.is_running() and (args.max_frames <= 0 or frames < args.max_frames):
-        rclpy.spin_once(node, timeout_sec=0.0)
+        for _ in range(20):  # handle every /cmd_vel received since the last cycle; the buffer keeps the newest
+            executor.spin_once(timeout_sec=0.0)
         t = lock.sim_time
         runner.policy_step(buffer.get(t), t)
         odom_pub.publish(odom_message(Odometry, runner, t))

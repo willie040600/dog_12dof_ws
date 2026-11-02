@@ -168,6 +168,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
   **不發佈 TF**（由 bridge.launch.py 負責）。
 - `/cmd_vel` 0.5 s 沒更新就視為 0；指令夾在訓練範圍（vx ±0.8、vy ±0.5、wz ±1.0）。
 - 實測（v8）：前進/側移 0.3 m/s 5 秒走 1.44 / 1.47 m，轉 0.8 rad/s 5 秒 3.9 rad，停送指令 1 s 內停穩，零指令 10 s 漂移 0。
+- 即時率（RTX 5070 Ti 筆電，headless，含 bridge）：有相機 0.53、`--no-camera` 0.58（sim 秒 / 牆鐘秒）。所有 ROS 端節點都用 sim time，模擬慢只影響牆鐘時間。
 - 一致性：`isaac/policy_parity.py` 和 `isaaclab/scripts/parity_reference.py` 比對同一段 60 s 指令，v8 十段速度差都 < 0.02 m/s。
 
 ## Isaac Sim 6.2（ROS 2 控制）
