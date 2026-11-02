@@ -2,6 +2,8 @@
 
 import dataclasses
 
+from isaaclab.envs import mdp
+from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.utils import configclass, replace
 
 from isaaclab_tasks.core.velocity.velocity_env_cfg import LocomotionVelocityRoughEnvCfg
@@ -69,6 +71,8 @@ class RobotDogFlatEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.rewards.dof_torques_l2.weight = -0.0002
         self.rewards.dof_acc_l2.weight = -2.5e-7
         self.rewards.flat_orientation_l2.weight = -2.5
+        # keep the base up: without this v7 crawled with the base ~0.09 m high (standing pose 0.237 m)
+        self.rewards.base_height_l2 = RewTerm(func=mdp.base_height_l2, weight=-50.0, params={"target_height": 0.23})
 
         # terminations / events: the trunk link is base_link
         self.terminations.base_contact.params["sensor_cfg"].body_names = "base_link"

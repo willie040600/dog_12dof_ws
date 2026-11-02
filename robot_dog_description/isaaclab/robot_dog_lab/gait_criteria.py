@@ -10,6 +10,7 @@ WARMUP_S = 2.0
 MEASURE_S = 5.0
 STAND_MEASURE_S = 10.0
 STAND_HEIGHT_RANGE = (0.20, 0.28)  # m, base height with zero actions (kp 20 sags under load)
+MIN_HEIGHT = 0.18  # m, mean base height while tracking a command; v7 crawled at ~0.09
 
 AXES = ('vx', 'vy', 'wz')
 
@@ -35,10 +36,12 @@ CASES = tuple(
 )
 
 
-def judge_case(case, mean_vel, drift, falls):
+def judge_case(case, mean_vel, drift, falls, height=None):
     """(passed, reason) for one case; mean_vel = achieved (vx, vy, wz) in the body frame."""
     if falls > 0:
         return False, '%d fall(s)' % falls
+    if height is not None and height < MIN_HEIGHT:
+        return False, 'height %.3f m < %.2f (crawling)' % (height, MIN_HEIGHT)
     if case.axis is None:
         if drift < DRIFT_TOL:
             return True, 'drift %.3f m' % drift

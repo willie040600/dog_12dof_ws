@@ -52,6 +52,7 @@ def main():
         warmup, measure, total = round(WARMUP_S / dt), round(MEASURE_S / dt), round((WARMUP_S + STAND_MEASURE_S) / dt)
         n = len(CASES)
         vel_sum = torch.zeros(n, 3, device=uenv.device)
+        height_sum = torch.zeros(n, device=uenv.device)
         falls = torch.zeros(n, dtype=torch.long, device=uenv.device)
         start_xy = None
 
@@ -66,17 +67,19 @@ def main():
                 if warmup <= i < warmup + measure:
                     vel_sum[:, :2] += robot.data.root_lin_vel_b.torch[:, :2]
                     vel_sum[:, 2] += robot.data.root_ang_vel_b.torch[:, 2]
+                    height_sum += robot.data.root_pos_w.torch[:, 2] - uenv.scene.env_origins[:, 2]
         mean_vel = (vel_sum / measure).tolist()
+        height = (height_sum / measure).tolist()
         drift = torch.linalg.norm(robot.data.root_pos_w.torch[:, :2] - start_xy, dim=-1).tolist()
         falls = falls.tolist()
 
         passed = 0
         print("[GAIT] policy %s" % policy_dir, flush=True)
         for k, case in enumerate(CASES):
-            ok, why = judge_case(case, tuple(mean_vel[k]), drift[k], falls[k])
+            ok, why = judge_case(case, tuple(mean_vel[k]), drift[k], falls[k], height[k])
             passed += ok
-            print("[GAIT] %-8s cmd=(%+.2f %+.2f %+.2f) got=(%+.3f %+.3f %+.3f) drift=%.3f falls=%d %s %s" % (
-                case.name, *case.command, *mean_vel[k], drift[k], falls[k], "PASS" if ok else "FAIL", why), flush=True)
+            print("[GAIT] %-8s cmd=(%+.2f %+.2f %+.2f) got=(%+.3f %+.3f %+.3f) z=%.3f drift=%.3f falls=%d %s %s" % (
+                case.name, *case.command, *mean_vel[k], height[k], drift[k], falls[k], "PASS" if ok else "FAIL", why), flush=True)
         print("[GAIT] PASS %d/%d" % (passed, len(CASES)), flush=True)
         env.close()
         raise SystemExit(0 if passed == len(CASES) else 1)  # inside the block, so launch_simulation keeps it

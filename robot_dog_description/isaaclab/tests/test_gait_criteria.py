@@ -48,3 +48,10 @@ def test_judge_stand():
     assert judge_stand([0.22] * 16, 0)[0]
     assert not judge_stand([0.22] * 15 + [0.15], 0)[0]
     assert not judge_stand([0.22] * 16, 1)[0]
+
+
+def test_crawling_fails():
+    ok, why = judge_case(_case("vx+0.30"), (0.30, 0.0, 0.0), 0.0, 0, height=0.09)
+    assert not ok and "height" in why
+    assert judge_case(_case("vx+0.30"), (0.30, 0.0, 0.0), 0.0, 0, height=0.22)[0]
+    assert not judge_case(_case("stand"), (0.0, 0.0, 0.0), 0.0, 0, height=0.10)[0]

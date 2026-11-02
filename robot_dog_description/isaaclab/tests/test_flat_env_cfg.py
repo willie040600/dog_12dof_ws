@@ -82,3 +82,13 @@ def test_timing_and_action_scale():
     assert cfg.sim.dt == pytest.approx(0.005)
     assert cfg.decimation == 4
     assert cfg.actions.joint_pos.scale == pytest.approx(0.25)
+
+
+def test_base_height_reward():
+    # without it v7 crawled with the base ~0.09 m high (standing pose 0.237 m)
+    from isaaclab.envs import mdp
+
+    term = RobotDogFlatEnvCfg().rewards.base_height_l2
+    assert term.func is mdp.base_height_l2
+    assert term.weight == pytest.approx(-50.0)
+    assert term.params["target_height"] == pytest.approx(0.23)
