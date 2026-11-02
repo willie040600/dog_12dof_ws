@@ -1,7 +1,7 @@
 {
   "task": "RobotDog-Velocity-Flat",
-  "run": "2026-11-01_20-43-36_v7",
-  "checkpoint": "model_2450.pt",
+  "run": "2026-11-02_12-15-26_v8",
+  "checkpoint": "model_3200.pt",
   "joint_names": [
     "FL_hip_joint",
     "FR_hip_joint",
