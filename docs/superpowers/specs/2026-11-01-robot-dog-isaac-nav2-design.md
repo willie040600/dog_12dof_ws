@@ -289,10 +289,10 @@ robot_dog_navigation/
 - **odom_footprint**：訂閱 `/odom_gt`。發佈 `/odom`（frame `odom`、child `base_footprint`，只含 x、y、yaw 與平面速度），
   TF `odom→base_footprint`（x、y、yaw），以及 TF `base_footprint→base_link`（z、roll、pitch）。
   移植自 `~/robotdog_ws/dog_gait/dog_gait/odom_footprint_node.py`。
-- **scan_ground_filter**：訂閱 `/scan`。用掃描時間戳查 TF `odom→laser_link`，得到雷射的高度與 roll/pitch
-  （`odom` 是水平的），算出每條光束打到地面的距離，把距離 ≥ 該值 − 0.05 m 的點設為 `inf`，發佈 `/scan_filtered`。
-  姿態與高度只有 TF 這一個來源，不另外訂閱 `/imu`。
-  移植自 `~/robotdog_ws/dog_gait/dog_gait/scan_ground_filter_node.py`。
+- **scan_ground_filter**：訂閱 `/scan`。用掃描時間戳查 TF `odom→laser_link`（`odom` 是水平的，含機身傾斜），
+  把每個回波轉到 `odom` 座標，**高度 < 0.05 m 的視為打到地面**，設為 `inf`，發佈 `/scan_filtered`。
+  （原本寫的「打地距離 − 0.05 m」改成這個舊狗驗證過的作法：牆和障礙物不論機身怎麼傾斜都會保留。）
+  姿態與高度只有 TF 這一個來源，不另外訂閱 `/imu`。移植自 `~/robotdog_ws/dog_gait/dog_gait/scan_ground_filter_node.py`。
 
 ### 6.3 定位與建圖
 
