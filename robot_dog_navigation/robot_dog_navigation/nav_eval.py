@@ -83,7 +83,16 @@ def check_localization(nav, truth, buf):
     return False
 
 
-def run_goal(nav, truth, goal, timeout):
+def localization_error(buf, truth):
+    """Distance between map->base_footprint (SLAM/AMCL estimate) and ground truth, or nan."""
+    try:
+        t = buf.lookup_transform('map', 'base_footprint', Time()).transform.translation
+    except TransformException:
+        return math.nan
+    return math.hypot(t.x - truth.pose[0], t.y - truth.pose[1])
+
+
+def run_goal(nav, truth, goal, timeout, buf):
     name, x, y, yaw = goal
     nav.goToPose(make_pose(nav, x, y, yaw))
     t0, fell, timed_out = sim_seconds(nav), False, False
@@ -98,7 +107,8 @@ def run_goal(nav, truth, goal, timeout):
     status = nav.getResult().name  # SUCCEEDED / CANCELED / FAILED / UNKNOWN
     final = (truth.pose[0], truth.pose[1], truth.pose[3]) if truth.pose else (math.nan, math.nan, math.nan)
     ok, why = judge(goal, final, status, fell=fell, elapsed=elapsed, timeout=timeout)
-    print('[NAV] %-34s %s t=%5.1f s  %s' % (name, 'PASS' if ok else 'FAIL', elapsed, why), flush=True)
+    print('[NAV] %-34s %s t=%5.1f s  %s  (localization error %.3f m)' % (
+        name, 'PASS' if ok else 'FAIL', elapsed, why, localization_error(buf, truth)), flush=True)
     return ok
 
 
@@ -113,7 +123,9 @@ def main():
     nav.set_parameters([Parameter('use_sim_time', value=True)])
     truth = Truth(nav)
     buf = Buffer()
-    listener = TransformListener(buf, nav, spin_thread=True)
+    # own node for TF: BasicNavigator spins `nav` itself, so a listener thread on `nav` would put it in two executors
+    tf_node = rclpy.create_node('nav_eval_tf', parameter_overrides=[Parameter('use_sim_time', value=True)])
+    listener = TransformListener(buf, tf_node, spin_thread=True)
     nav.waitUntilNav2Active(localizer='robot_localization' if args.slam else 'amcl')
     while truth.pose is None:
         rclpy.spin_once(nav, timeout_sec=0.1)
@@ -121,14 +133,15 @@ def main():
         if not args.slam and not check_localization(nav, truth, buf):
             print('[NAV] FAIL: AMCL is not localized at the start', flush=True)
             return 1
-        passed = sum(run_goal(nav, truth, g, args.timeout) for g in GOALS)
+        passed = sum(run_goal(nav, truth, g, args.timeout, buf) for g in GOALS)
         print('[NAV] PASS %d/%d' % (passed, len(GOALS)), flush=True)
         if args.extra_goal:
             x, y, yaw = (float(v) for v in args.extra_goal.split(','))
-            run_goal(nav, truth, ('extra goal (not scored)', x, y, yaw), args.timeout)
+            run_goal(nav, truth, ('extra goal (not scored)', x, y, yaw), args.timeout, buf)
         return 0 if passed == len(GOALS) else 1
     finally:
         listener.unregister()  # stop its spin thread before rclpy shuts down (else a traceback at exit)
+        tf_node.destroy_node()
         nav.destroy_node()
         rclpy.try_shutdown()
 

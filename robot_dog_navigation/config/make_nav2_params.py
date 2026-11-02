@@ -45,7 +45,7 @@ def main():
 
     ctrl = p['controller_server']['ros__parameters']
     ctrl['controller_frequency'] = 20.0
-    ctrl['general_goal_checker'].update(xy_goal_tolerance=0.20, yaw_goal_tolerance=0.25)
+    ctrl['general_goal_checker'].update(xy_goal_tolerance=0.10, yaw_goal_tolerance=0.25)
     mppi = ctrl['FollowPath']
     mppi.update(motion_model='Omni', vx_max=0.5, vx_min=-0.3, vy_max=0.3, wz_max=0.8)
     if 'TwirlingCritic' not in mppi['critics']:

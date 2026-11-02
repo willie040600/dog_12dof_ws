@@ -9,6 +9,7 @@ import math
 
 import numpy as np
 import rclpy
+import rclpy.parameter
 from rclpy.node import Node
 from rclpy.time import Time
 from sensor_msgs.msg import LaserScan
@@ -23,7 +24,11 @@ class ScanGroundFilter(Node):
         self.fixed_frame = self.declare_parameter('fixed_frame', 'odom').value
         self.min_height = self.declare_parameter('min_height', 0.05).value
         self.buf = Buffer()
-        self.tl = TransformListener(self.buf, self, spin_thread=True)  # TF arrives while a scan is handled
+        # TF gets its own node and thread (TF arrives while a scan is handled). Giving TransformListener this
+        # node with spin_thread=True put one node in two executors and crashed (segfault) intermittently.
+        self.tf_node = rclpy.create_node('scan_ground_filter_tf', parameter_overrides=[
+            rclpy.parameter.Parameter('use_sim_time', value=self.get_parameter('use_sim_time').value)])
+        self.tl = TransformListener(self.buf, self.tf_node, spin_thread=True)
         self.pub = self.create_publisher(LaserScan, 'scan_filtered', 10)
         self.create_subscription(LaserScan, 'scan', self.on_scan, 10)
         self.dropped = 0
