@@ -77,13 +77,9 @@ def flat_world(stage, meta):
     add_lights(stage)
 
 
-# room for the navigation mode (spec 5.5); plan 3's nav_eval goals use these coordinates
-ROOM_HALF = 5.0         # 10 x 10 m
-WALL_HEIGHT, WALL_THICKNESS = 1.0, 0.1
-INNER_WALLS = ((-1.7, (2.5, 3.5)), (1.7, (-3.5, -2.5)))   # (x, doorway y range): three zones, 1 m doorways
-BOXES = (((-3.5, -3.0), 0.5), ((-3.3, 1.0), 0.4), ((3.2, 2.5), 0.6), ((3.5, -1.0), 0.45))   # ((x, y), size)
-CYLINDERS = ((0.0, 3.0), (1.0, -3.0), (-1.0, -2.5))   # (x, y), diameter 0.3 m, height 0.8 m
-CYLINDER_RADIUS, CYLINDER_HEIGHT = 0.15, 0.8
+# the room's dimensions and obstacles live in room_layout.py (shared with nav_goals and map_check)
+from .room_layout import (BOXES, CYLINDER_HEIGHT, CYLINDER_RADIUS, CYLINDERS, INNER_WALLS,  # noqa: E402
+                          ROOM_HALF, WALL_HEIGHT, WALL_THICKNESS)
 
 
 def static_cylinder(stage, path, center, radius, height, color, material):
