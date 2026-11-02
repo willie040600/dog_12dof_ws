@@ -19,6 +19,8 @@ class Lockstep:
         settings.set("/app/player/playSimulations", False)
         omni.timeline.get_timeline_interface().play()
         app.update()
+        # Kit initializes physics (and the tensor views Articulation needs) only when it steps physics itself
+        SimulationManager.initialize_physics()
         self._physx = omni.physx.get_physx_simulation_interface()
         self._steps = 0
 

@@ -119,7 +119,11 @@ def apply_policy_dof_settings(articulation, meta, dof_indices):
     mat = wp.to_torch(view.get_material_properties()).clone()
     r = meta['materials']['robot']
     mat[..., 0], mat[..., 1], mat[..., 2] = r['static_friction'], r['dynamic_friction'], r['restitution']
-    view.set_material_properties(wp.from_torch(mat.contiguous()), wp.array([0], dtype=wp.int32))
+    import torch
+
+    # like Isaac Lab's event: float32 materials and CPU int32 indices (the material API runs on the CPU)
+    view.set_material_properties(wp.from_torch(mat.contiguous(), dtype=wp.float32),
+                                 wp.from_torch(torch.zeros(1, dtype=torch.int32), dtype=wp.int32))
     reset_pose(articulation, meta, dof_indices)
 
 
