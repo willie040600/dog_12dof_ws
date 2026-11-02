@@ -79,7 +79,8 @@ def imu_graph(stage, imu_path, topic='/imu', frame_id='imu_link'):
 
 
 def camera_graph(stage, cam_path, size, topic='/camera/image_raw', info_topic='/camera/camera_info',
-                 frame_id='camera_optical_link'):
+                 frame_id='camera_optical_link', frame_skip=0):
+    """frame_skip: app updates skipped between publishes (2 at the 50 Hz policy rate = ~16.7 Hz)."""
     width, height = size
     graph(stage, '/ROS/camera',
           [TICK, CONTEXT, RENDER_PRODUCT,
@@ -90,7 +91,8 @@ def camera_graph(stage, cam_path, size, topic='/camera/image_raw', info_topic='/
            ('PubImage.inputs:type', 'rgb'), ('PubImage.inputs:topicName', topic),
            ('PubImage.inputs:frameId', frame_id),
            ('PubInfo.inputs:topicName', info_topic),
-           ('PubInfo.inputs:frameId', frame_id)],
+           ('PubInfo.inputs:frameId', frame_id),
+           ('PubImage.inputs:frameSkipCount', frame_skip), ('PubInfo.inputs:frameSkipCount', frame_skip)],
           [('Tick.outputs:tick', 'RenderProduct.inputs:execIn'),
            ('RenderProduct.outputs:execOut', 'PubImage.inputs:execIn'),
            ('RenderProduct.outputs:execOut', 'PubInfo.inputs:execIn'),

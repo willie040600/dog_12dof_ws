@@ -242,8 +242,10 @@ cd ~/IsaacLab && uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_descrip
 - `/cmd_vel`：rclpy 節點在腳本內訂閱，每個渲染幀 `spin_once(timeout_sec=0)`。策略步讀最新值與收到時間（sim time）。
   - 夾在 `command_ranges` 之內。
   - **超過 0.5 s 沒收到 → 指令視為 0。**
-- 站立保持（預設開，`--no-hold` 關閉）：指令的 \|vx\|、\|vy\| < 0.02 且 \|wz\| < 0.05 持續 0.3 s →
-  `q_target = default`，不跑策略；指令恢復時 `last_action` 歸零，從下一個策略步開始跑策略。
+- 站立保持（**預設關**，`--hold` 開啟）：指令的 \|vx\|、\|vy\| < 0.02 且 \|wz\| < 0.05 持續 0.3 s，且機身已幾乎靜止
+  （< 0.05 m/s、< 0.1 rad/s）→ `q_target = default`，不跑策略；指令恢復時 `last_action` 歸零。
+  預設關閉的原因（計畫 2 實測）：剛停下時腳還沒回到髖下方，把關節固定在標準站姿會讓狗踉蹌
+  （停止 1 s 後仍有 0.17 m/s、0.87 rad/s）；不保持時 v8 自己 1 s 內停穩（≤ 0.032 m/s），零指令 10 s 漂移 0.000 m。
 - 跌倒偵測：機身高度 < 0.12 m 或傾斜 > 60° → 印出錯誤（含 sim time），每次跌倒只印一次。
 
 ### 5.4 感測器

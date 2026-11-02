@@ -54,7 +54,8 @@ class PolicyRunner:
         gravity_b = quat_rotate_inverse_wxyz(self.base_quat, torch.tensor([0.0, 0.0, -1.0]))
         self.fallen = is_fallen(float(self.base_pos[2]), float(gravity_b[2]))
 
-        hold = self._hold.update(command, t)
+        speed = (float(self.lin_vel_w[:2].norm()), abs(float(self.ang_vel_w[2])))
+        hold = self._hold.update(command, t, speed)
         if self._hold.resumed():
             self.last_action.zero_()
         if hold:

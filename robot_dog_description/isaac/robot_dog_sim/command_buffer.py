@@ -24,22 +24,30 @@ class CommandBuffer:
 
 
 class IdleHold:
-    """Hold the standing pose once the command has been ~zero for hold_after seconds."""
+    """Hold the standing pose once the command has been ~zero for hold_after seconds and the body is still.
 
-    def __init__(self, enabled, hold_after=0.3, lin_eps=0.02, ang_eps=0.05):
+    Waiting for the body to stop (the policy brakes it) matters: freezing the targets mid-stride made the
+    dog lurch.
+    """
+
+    def __init__(self, enabled, hold_after=0.3, lin_eps=0.02, ang_eps=0.05, still_lin=0.05, still_ang=0.1):
         self._enabled = enabled
         self._hold_after, self._lin_eps, self._ang_eps = hold_after, lin_eps, ang_eps
+        self._still_lin, self._still_ang = still_lin, still_ang
         self._idle_since = None
         self._holding = False
         self._resumed = False
 
-    def update(self, cmd, t):
+    def update(self, cmd, t, speed=(0.0, 0.0)):
+        """speed = (planar body speed m/s, |yaw rate| rad/s)."""
         idle = abs(cmd[0]) < self._lin_eps and abs(cmd[1]) < self._lin_eps and abs(cmd[2]) < self._ang_eps
         if not idle:
             self._idle_since = None
         elif self._idle_since is None:
             self._idle_since = t
-        hold = self._enabled and idle and t - self._idle_since >= self._hold_after
+        still = speed[0] < self._still_lin and speed[1] < self._still_ang
+        hold = (self._enabled and idle and t - self._idle_since >= self._hold_after
+                and (still or self._holding))
         self._resumed = self._holding and not hold
         self._holding = hold
         return hold

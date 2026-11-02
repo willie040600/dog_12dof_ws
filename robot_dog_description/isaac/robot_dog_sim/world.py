@@ -75,3 +75,45 @@ def flat_world(stage, meta):
     apply_physics_settings(stage, meta)
     static_box(stage, '/World/ground', (0, 0, -0.05), (100, 100, 0.1), (0.6, 0.6, 0.6), policy_ground(stage, meta))
     add_lights(stage)
+
+
+# room for the navigation mode (spec 5.5); plan 3's nav_eval goals use these coordinates
+ROOM_HALF = 5.0         # 10 x 10 m
+WALL_HEIGHT, WALL_THICKNESS = 1.0, 0.1
+INNER_WALLS = ((-1.7, (2.5, 3.5)), (1.7, (-3.5, -2.5)))   # (x, doorway y range): three zones, 1 m doorways
+BOXES = (((-3.5, -3.0), 0.5), ((-3.3, 1.0), 0.4), ((3.2, 2.5), 0.6), ((3.5, -1.0), 0.45))   # ((x, y), size)
+CYLINDERS = ((0.0, 3.0), (1.0, -3.0), (-1.0, -2.5))   # (x, y), diameter 0.3 m, height 0.8 m
+CYLINDER_RADIUS, CYLINDER_HEIGHT = 0.15, 0.8
+
+
+def static_cylinder(stage, path, center, radius, height, color, material):
+    cyl = UsdGeom.Cylinder.Define(stage, path)
+    cyl.CreateRadiusAttr(radius)
+    cyl.CreateHeightAttr(height)
+    cyl.CreateAxisAttr('Z')
+    cyl.CreateDisplayColorAttr([Gf.Vec3f(*color)])
+    UsdGeom.Xformable(cyl).AddTranslateOp().Set(Gf.Vec3d(*center))
+    UsdPhysics.CollisionAPI.Apply(cyl.GetPrim())
+    UsdShade.MaterialBindingAPI.Apply(cyl.GetPrim()).Bind(material, UsdShade.Tokens.weakerThanDescendants, 'physics')
+    return cyl.GetPrim()
+
+
+def room_world(stage, meta):
+    """Training physics and ground, plus the 10 x 10 m room with two inner walls, boxes and cylinders."""
+    apply_physics_settings(stage, meta)
+    ground = policy_ground(stage, meta)
+    static_box(stage, '/World/ground', (0, 0, -0.05), (40, 40, 0.1), (0.6, 0.6, 0.6), ground)
+    wall, h, t, r = (0.75, 0.72, 0.68), WALL_HEIGHT, WALL_THICKNESS, ROOM_HALF
+    for i, (center, size) in enumerate((((0, r, h / 2), (2 * r + t, t, h)), ((0, -r, h / 2), (2 * r + t, t, h)),
+                                        ((r, 0, h / 2), (t, 2 * r, h)), ((-r, 0, h / 2), (t, 2 * r, h)))):
+        static_box(stage, '/World/room/outer_%d' % i, center, size, wall, ground)
+    for i, (x, (g0, g1)) in enumerate(INNER_WALLS):
+        for j, (y0, y1) in enumerate(((-r, g0), (g1, r))):
+            static_box(stage, '/World/room/inner_%d_%d' % (i, j), (x, (y0 + y1) / 2, h / 2), (t, y1 - y0, h), wall,
+                       ground)
+    for i, ((x, y), s) in enumerate(BOXES):
+        static_box(stage, '/World/room/box_%d' % i, (x, y, s / 2), (s, s, s), (0.8, 0.3, 0.2), ground)
+    for i, (x, y) in enumerate(CYLINDERS):
+        static_cylinder(stage, '/World/room/cylinder_%d' % i, (x, y, CYLINDER_HEIGHT / 2), CYLINDER_RADIUS,
+                        CYLINDER_HEIGHT, (0.2, 0.4, 0.8), ground)
+    add_lights(stage)

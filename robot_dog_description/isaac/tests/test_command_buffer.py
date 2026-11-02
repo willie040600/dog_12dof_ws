@@ -48,3 +48,12 @@ def test_is_fallen():
     assert is_fallen(0.10, -1.0)
     assert is_fallen(0.25, -math.cos(math.radians(70)))
     assert not is_fallen(0.25, -math.cos(math.radians(50)))
+
+
+def test_hold_waits_until_the_body_is_still():
+    # freezing the targets mid-stride made the dog lurch (0.19 m/s + 0.85 rad/s 1 s after stopping)
+    h = IdleHold(enabled=True)
+    assert h.update((0.0, 0.0, 0.0), 0.0, speed=(0.30, 0.0)) is False
+    assert h.update((0.0, 0.0, 0.0), 0.5, speed=(0.20, 0.0)) is False
+    assert h.update((0.0, 0.0, 0.0), 0.6, speed=(0.01, 0.30)) is False
+    assert h.update((0.0, 0.0, 0.0), 0.7, speed=(0.01, 0.02)) is True

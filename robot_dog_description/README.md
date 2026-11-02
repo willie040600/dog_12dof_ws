@@ -138,6 +138,38 @@ ros2 control switch_controllers --activate joint_group_effort_controller --deact
 關節順序（所有控制器、`rl_defaults.yaml` 一致）：
 `FL_hip, FL_thigh, FL_calf, FR_hip, FR_thigh, FR_calf, RL_hip, RL_thigh, RL_calf, RR_hip, RR_thigh, RR_calf`
 
+## Isaac Sim 6.2 導航模式（策略在 Isaac Sim 內執行）
+
+訓練好的策略直接在 Isaac Sim 腳本裡跑，和 Isaac Lab 訓練時一樣同步步進（每 4 個 5 ms 物理步跑一次策略），
+ROS 2 只收 `/cmd_vel`，所以在 Nav2 看來就是一台「聽 `cmd_vel` 的底盤」。
+策略與物理設定都讀 `isaac/policies/<run>/policy.json`；預設用 `policies/` 下名稱排序最後的資料夾。
+
+```bash
+# 終端 1：Isaac Sim（10 × 10 m 房間、IMU、2D LiDAR、相機）
+source /opt/ros/jazzy/setup.bash
+cd ~/IsaacLab && export OMNI_KIT_ACCEPT_EULA=yes
+uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/robot_dog_nav_sim.py
+# 終端 2：TF 與雷射地面過濾（robot_dog_navigation 套件，見該套件 README）
+cd ~/dog_12dof_ws && source install/setup.bash
+ros2 launch robot_dog_navigation bridge.launch.py
+# 終端 3：手動遙控（可以側移：teleop 按 Shift）
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+| 參數 | 說明 |
+|---|---|
+| `--policy <資料夾>` | 指定策略（`policy.pt` + `policy.json`） |
+| `--headless` / `--no-camera` | 不開視窗 / 不建相機（筆電省資源） |
+| `--hold` | 指令為 0 且機身靜止 0.3 s 後固定站姿（預設關：剛停下就固定會踉蹌，策略自己站得很穩） |
+| `--world <USD>` | 載入其他場景取代內建房間 |
+| `--max-frames N` | 跑 N 個策略步後結束（smoke test） |
+
+- 發佈 `/clock`、`/joint_states`、`/imu`、`/scan`（10 Hz）、`/camera/image_raw`（約 16 Hz）、`/odom_gt`（真值，`odom→base_link`，50 Hz）；
+  **不發佈 TF**（由 bridge.launch.py 負責）。
+- `/cmd_vel` 0.5 s 沒更新就視為 0；指令夾在訓練範圍（vx ±0.8、vy ±0.5、wz ±1.0）。
+- 實測（v8）：前進/側移 0.3 m/s 5 秒走 1.44 / 1.47 m，轉 0.8 rad/s 5 秒 3.9 rad，停送指令 1 s 內停穩，零指令 10 s 漂移 0。
+- 一致性：`isaac/policy_parity.py` 和 `isaaclab/scripts/parity_reference.py` 比對同一段 60 s 指令，v8 十段速度差都 < 0.02 m/s。
+
 ## Isaac Sim 6.2（ROS 2 控制）
 
 ros2_control 在 Isaac Sim 模式（`sim_mode:=isaac`）使用 ros2_control 官方的
