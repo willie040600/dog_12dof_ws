@@ -367,6 +367,11 @@ slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 �
    - `observations.py` 要檢查 `obs_terms` 的名稱與順序。匯出目前只檢查關節集合；要另外確認 `joint_names` 等於
      articulation 順序，否則 `joint_pos_rel` / `joint_vel_rel` 的順序可能和 `joint_names` 不同。
    - `robot_dog_isaac.py --effort` 模式沒有 armature；若用外部 PD 驅動，可能和訓練初期一樣數值發散。
+   計畫 2 留給計畫 3 的事項（2026-11-02 計畫 2 結案時記錄）：
+   - 導航模式在筆電上的即時率還沒量（headless、有無相機）；調 Nav2 與 teleop 前先量，0.5 s 指令逾時是 sim time。
+   - `robot_dog_nav_sim.py` 每個循環只處理一則 `/cmd_vel`（`spin_once`），指令頻率高於模擬循環時可能延遲；
+     `scan_ground_filter` 查 TF 時會等 50 ms（`TransformListener` 沒開 spin thread）。
+   - `world.py` 的 `INNER_WALLS`、`BOXES`、`CYLINDERS` 是 `nav_eval` 目標點要避開的障礙物座標。
 3. **計畫 3：M4 + M5**：slam_toolbox、AMCL、Nav2 參數、RViz、`nav_eval`。
 
 ## 8. 測試
