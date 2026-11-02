@@ -47,10 +47,10 @@ def main():
     ctrl['controller_frequency'] = 20.0
     ctrl['general_goal_checker'].update(xy_goal_tolerance=0.10, yaw_goal_tolerance=0.25)
     mppi = ctrl['FollowPath']
-    mppi.update(motion_model='Omni', vx_max=0.5, vx_min=-0.3, vy_max=0.3, wz_max=0.8)
-    if 'TwirlingCritic' not in mppi['critics']:
-        mppi['critics'].append('TwirlingCritic')
-    mppi['TwirlingCritic'] = {'enabled': True, 'twirling_cost_power': 1, 'twirling_cost_weight': 10.0}
+    # walk head first: sideways only slowly, for the last few cm at a goal (DiffDrive, with no sidestep at all, got
+    # stuck 0.2-0.3 m beside a goal it had overshot); no TwirlingCritic, which made crabbing cheaper than turning;
+    # small vy_std, else the samples sit at the vy limit and the dog crabs ~8 deg while cruising
+    mppi.update(motion_model='Omni', vx_max=0.5, vx_min=-0.1, vy_max=0.1, vy_std=0.05, wz_max=0.8)
 
     for name in ('local_costmap', 'global_costmap'):
         c = p[name][name]['ros__parameters']
@@ -61,7 +61,7 @@ def main():
         layer['scan']['topic'] = '/scan_filtered'
 
     vs = p['velocity_smoother']['ros__parameters']
-    vs.update(max_velocity=[0.5, 0.3, 0.8], min_velocity=[-0.3, -0.3, -0.8], max_accel=[1.0, 1.0, 2.0],
+    vs.update(max_velocity=[0.5, 0.1, 0.8], min_velocity=[-0.1, -0.1, -0.8], max_accel=[1.0, 1.0, 2.0],
               max_decel=[-1.0, -1.0, -2.0], deadband_velocity=[0.0, 0.0, 0.0])
 
     p['collision_monitor']['ros__parameters']['scan']['topic'] = '/scan_filtered'

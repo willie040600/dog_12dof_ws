@@ -51,3 +51,19 @@ def judge(goal, final_pose, status, fell, elapsed, timeout=120.0):
     if yaw_err > YAW_TOLERANCE:
         return False, 'yaw error %.2f rad > %.2f' % (yaw_err, YAW_TOLERANCE)
     return True, 'distance %.2f m, yaw error %.2f rad' % (dist, yaw_err)
+
+
+def sideways_share(velocities, window=10, min_speed=0.1, max_angle=math.radians(20)):
+    """Share of the moving time the dog travels more than max_angle off its heading (crab walk or backwards).
+
+    velocities: (vx, vy) in base_link at 50 Hz; averaged over `window` samples first so the trot's side-to-side
+    sway does not count. Windows slower than min_speed (standing, turning in place) are ignored.
+    """
+    means = []
+    for i in range(0, len(velocities) - window + 1, window):
+        chunk = velocities[i:i + window]
+        means.append((sum(v[0] for v in chunk) / window, sum(v[1] for v in chunk) / window))
+    moving = [(vx, vy) for vx, vy in means if math.hypot(vx, vy) >= min_speed]
+    if not moving:
+        return 0.0
+    return sum(abs(math.atan2(vy, vx)) > max_angle for vx, vy in moving) / len(moving)

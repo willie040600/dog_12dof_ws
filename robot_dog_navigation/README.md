@@ -43,7 +43,7 @@ ros2 run robot_dog_navigation nav_eval                   # 配 slam:=False
 ros2 run robot_dog_navigation nav_eval --extra-goal=-3.3,1.0,0.0   # 多送一個到不了的目標（不計分）
 ```
 依序送 `nav_goals.py` 的 5 個目標（三個區域，兩個要穿過內牆門口）；每個目標用 Isaac Sim 的真值 `/odom_gt`
-判定：0.25 m、0.3 rad 內、120 s（sim time）內、沒有跌倒。每個目標印一行 `[NAV]`（含當下的定位誤差），
+判定：0.25 m、0.3 rad 內、120 s（sim time）內、沒有跌倒。每個目標印一行 `[NAV]`（含當下的定位誤差與 sideways），
 最後 `[NAV] PASS k/5`；5 個都通過才 exit 0。AMCL 模式會先檢查初始定位誤差（> 0.1 m 就重設一次初始位置）。
 
 ### 結果（v8 策略，RTX 5070 Ti 筆電，headless、`--no-camera`）
@@ -77,7 +77,20 @@ TF 樹：`map → odom → base_footprint → base_link → {FL/FR/RL/RR 的 hip
 ```bash
 python3 robot_dog_navigation/config/make_nav2_params.py
 ```
-主要改動：機器人座標 `base_footprint`、雷射 `/scan_filtered`；AMCL `OmniMotionModel`；MPPI `Omni`（vx −0.3～0.5、
-vy ±0.3、wz ±0.8，加 TwirlingCritic）；goal checker 0.10 m / 0.25 rad；footprint 0.44 × 0.32 m；inflation 0.35 m。
+主要改動：機器人座標 `base_footprint`、雷射 `/scan_filtered`；AMCL `OmniMotionModel`；MPPI `Omni`（vx −0.1～0.5、
+vy ±0.1、wz ±0.8，`vy_std` 0.05）；goal checker 0.10 m / 0.25 rad；footprint 0.44 × 0.32 m；inflation 0.35 m。
+
+**頭朝前走**：狗雖然能側移，導航時要轉身面向路徑、頭朝前走，不要斜著走。`nav_eval` 每個目標印出 `sideways`：
+移動時間中，行進方向偏離機頭 20° 以上的比例（0.2 s 平均，步態的左右晃動不算；倒退也算）。
+
+| MPPI 設定 | sideways | 巡航（≥ 0.3 m/s）偏角中位數 | 卡住 |
+|---|---|---|---|
+| `Omni` vy ±0.3 + TwirlingCritic（舊） | 87% | — | 無 |
+| `DiffDrive`（不能側移） | 1% | 0° | 6 次有 3 次：衝過目標停在旁邊 0.2–0.3 m，要側移才到得了，等約 40 s 後 Nav2 原地轉圈才脫困 |
+| `Omni` vy ±0.1、`vy_std` 0.2 | 13% | 8° | 無 |
+| **`Omni` vy ±0.1、`vy_std` 0.05（目前）** | **3%** | **0–1°** | **無** |
+
+所以保留一點側移（0.1 m/s）給到達目標前的微調；拿掉 TwirlingCritic（它讓「斜走」比「轉身」便宜）；
+`vy_std` 調小，否則取樣的 vy 常貼在上限，巡航時一路斜 8°。
 
 測試（純 Python）：`cd robot_dog_navigation && python3 -m pytest test -q`

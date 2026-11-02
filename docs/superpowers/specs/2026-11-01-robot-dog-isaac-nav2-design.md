@@ -313,7 +313,7 @@ robot_dog_navigation/
 | 項目 | 設定 |
 |---|---|
 | planner | NavFn |
-| controller | MPPI，`motion_model: Omni`，vx −0.3～0.5、vy ±0.3、wz ±0.8，20 Hz，加 TwirlingCritic |
+| controller | MPPI，`motion_model: Omni`，vx −0.1～0.5、vy ±0.1（`vy_std` 0.05）、wz ±0.8，20 Hz；頭朝前走，側移只用在到達目標前的微調（`nav_eval` 的 sideways 3%；舊設定 vy ±0.3 + TwirlingCritic 是 87%；`DiffDrive` 不能側移，衝過目標時會卡住） |
 | goal checker | xy 0.10 m、yaw 0.25 rad（比 M5 的 0.25 m 緊，留給定位誤差） |
 | velocity_smoother | 同上限，加速度 vx/vy 1.0 m/s²、wz 2.0 rad/s²，`deadband_velocity` 全 0 |
 | footprint | 多邊形 `[[0.22, 0.16], [0.22, -0.16], [-0.22, -0.16], [-0.22, 0.16]]` |

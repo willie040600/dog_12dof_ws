@@ -1,6 +1,6 @@
 import math
 
-from robot_dog_navigation.nav_goals import GOALS, judge, pose_error, room_layout
+from robot_dog_navigation.nav_goals import GOALS, judge, pose_error, room_layout, sideways_share
 
 ROOM = room_layout()
 
@@ -41,3 +41,21 @@ def test_judge_failures():
     for pose, status, fell, elapsed, word in cases:
         ok, why = judge(GOAL, pose, status, fell=fell, elapsed=elapsed)
         assert not ok and word in why, (word, why)
+
+
+def test_sideways_share():
+    forward = [(0.4, 0.02)] * 50
+    crab = [(0.2, 0.25)] * 50          # 51 degrees off the heading
+    backward = [(-0.2, 0.0)] * 50
+    standing = [(0.01, 0.03)] * 50     # below the speed threshold: ignored
+    assert sideways_share(forward) == 0.0
+    assert sideways_share(crab) == 1.0
+    assert sideways_share(backward) == 1.0
+    assert sideways_share(forward + crab) == 0.5
+    assert sideways_share(forward + standing) == 0.0
+    assert sideways_share([]) == 0.0
+
+
+def test_sideways_share_averages_out_gait_sway():
+    sway = [(0.3, 0.3 if i % 2 else -0.3) for i in range(50)]   # side to side every sample, straight on average
+    assert sideways_share(sway) == 0.0
