@@ -121,6 +121,8 @@
      vy = wz = 0 的指令只有站立環境的 0，策略因此把小指令當成站立（run v4–v6）。
   2. `commands.base_velocity.rel_standing_envs` 從 0.02 調成 **0.1**，讓策略學會零指令時站穩不踏步。
   3. 指令範圍維持 vx ±0.8、vy ±0.5、wz ±1.0。Nav2 的上限在範圍之內（第 6 節）。
+  5. 新增 `base_height_l2`（目標 **0.23 m**，權重 **−50**）：沒有高度獎勵時，策略學成壓低機身、腹部離地 4–5 cm 趴著爬
+     （run v7，機身約 0.09 m；計畫 2 一致性測試時發現）。v8 = v7 加這一項接著訓練，站高約 0.226 m。
   4. `commands.base_velocity.heading_command` 從 True 改成 **False**：wz 直接均勻取樣，和 Nav2 直接送 wz 的用法相同
      （Isaac Lab 預設是由航向誤差算出 wz）。
 - 領域隨機化保留 Isaac Lab 預設（摩擦、機身質量、推力、外力）。
@@ -129,7 +131,7 @@
 ### 4.3 評估 `gait_eval.py`（Isaac Lab，單一環境、關閉推力與雜訊）
 
 每個指令先暖身 2 秒，再量 5 秒平均速度。誤差除了小於表中門檻，**也要小於指令大小的一半**
-（否則站著不動也能通過 ±0.1 的指令，因為那時誤差剛好是 0.1）：
+（否則站著不動也能通過 ±0.1 的指令，因為那時誤差剛好是 0.1）。另外每個情境的**平均機身高度要 ≥ 0.18 m**（擋掉趴著爬）：
 
 | 項目 | 指令 | 通過 |
 |---|---|---|
@@ -216,7 +218,7 @@ isaac/
 ```bash
 source /opt/ros/jazzy/setup.bash
 cd ~/IsaacLab && uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/robot_dog_nav_sim.py \
-    --policy ~/dog_12dof_ws/robot_dog_description/isaac/policies/<run> [--headless] [--no-camera] [--no-hold] [--world x.usd]
+    --policy ~/dog_12dof_ws/robot_dog_description/isaac/policies/<run> [--headless] [--no-camera] [--hold] [--world x.usd]
 ```
 
 `--policy` 預設為 `policies/` 下名稱排序最後的資料夾。
@@ -345,7 +347,7 @@ slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 �
 | M0 | 環境確認 | 安裝 `ros-jazzy-joint-state-topic-hardware-interface`；`colcon build` `robot_dog_description` 成功（`robot_dog_navigation` 在 M3 才建）；Isaac Sim 程序內的 rclpy 能收到同程序 OmniGraph 發佈的 `/clock`；重構後的 `robot_dog_isaac.py` 列出各感測器 ok，`isaac.launch.py` + `stand_up.py` 能讓狗站起來 |
 | M1 | RL 訓練 | 4.1 三步通過；正式訓練完成；`gait_eval.py` 全部通過（4.3）；匯出 `policy.pt` + `policy.json` |
 | M2 | Isaac Sim 跑策略 | `policy_parity.py`：同一段 60 秒指令序列（前進、側移、轉向、停止各段）分別在 Isaac Lab（單一環境、無雜訊無推力）與 Isaac Sim（無 ROS、無感測器）執行，**每段平均機身速度差 < 0.05 m/s、角速度差 < 0.1 rad/s**，兩邊都沒跌倒 |
-| M3 | ROS 2 橋接 | 3.1 表內話題頻率正確（`ros2 topic hz`）；`view_frames` 的 TF 樹與 3.2 相同；`teleop_twist_keyboard` 能讓狗前進、側移、轉彎；停送 `cmd_vel` 後 0.5 s 內進入站立 |
+| M3 | ROS 2 橋接 | 3.1 表內話題頻率正確（`ros2 topic hz`）；`view_frames` 的 TF 樹與 3.2 相同；`teleop_twist_keyboard` 能讓狗前進、側移、轉彎；停送 `cmd_vel` 後 1 s 內停穩（0.5 s 逾時 + 0.5 s 煞停） |
 | M4 | SLAM | teleop 繞房間一圈，地圖閉合、牆面沒有重影；`map_saver_cli` 存成 `maps/robot_dog_room` |
 | M5 | Nav2 導航 | `nav_eval.py` 用 `nav2_simple_commander` 依序送 5 個固定目標（三個區域都有，至少一個要穿過內牆通道），SLAM 與 AMCL 兩模式**全部到達**（0.25 m、0.3 rad 內），單一目標 120 s（sim time）內完成，全程沒有跌倒訊息 |
 
@@ -386,7 +388,7 @@ slam_toolbox 或 map_server + amcl、Nav2、RViz。Isaac Sim 另外在終端 1 �
 | `policy.json` 缺欄位或 `obs_terms` 總維度 ≠ 策略輸入 | 拒絕啟動，指出缺哪個欄位或兩個維度 |
 | 導航模式 LiDAR 建立失敗 | 結束程式 |
 | IMU／相機建立失敗 | 警告，繼續執行 |
-| `/cmd_vel` 逾時 0.5 s | 指令歸零（進入站立保持） |
+| `/cmd_vel` 逾時 0.5 s | 指令歸零，策略自己停下站穩（`--hold` 時再固定站姿） |
 | 跌倒 | 印錯誤一次；`nav_eval` 判定失敗 |
 | 模擬慢於即時 | 全部 sim time；`transform_tolerance` 0.5 s |
 

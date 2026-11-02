@@ -23,3 +23,8 @@ def require_ros_jazzy():
     if distro != 'jazzy':
         log('ROS 2 Jazzy is not sourced (ROS_DISTRO=%s): run "source /opt/ros/jazzy/setup.bash" first' % distro)
         raise SystemExit(2)
+
+
+def sim_time_to_stamp(t):
+    """(sec, nanosec) for builtin_interfaces/Time; rounding to 1e9 ns carries into seconds, never back."""
+    return divmod(int(round(t * 1e9)), 1000000000)

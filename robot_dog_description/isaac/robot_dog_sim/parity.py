@@ -49,3 +49,8 @@ def compare(ref, got, lin_tol=0.05, ang_tol=0.1):
         if d[0] > lin_tol or d[1] > lin_tol or d[2] > ang_tol:
             failures.append("%s: ref (%+.3f %+.3f %+.3f) got (%+.3f %+.3f %+.3f)" % (label, *r, *g))
     return failures
+
+
+def verdict(failures, sim_fallen, ref_falls):
+    """Parity passes only with every segment in tolerance and no fall on either side (spec M2)."""
+    return not failures and not sim_fallen and ref_falls == 0

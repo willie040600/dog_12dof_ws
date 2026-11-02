@@ -22,7 +22,7 @@ sys.path.insert(0, HERE)
 
 from robot_dog_sim.robot_spec import (CAMERA_HFOV, CAMERA_SIZE, CAMERA_XYZ, DEFAULT_URDF, IMU_XYZ,  # noqa: E402
                                       LASER_XYZ)
-from robot_dog_sim.util import log, require_ros_jazzy, try_step  # noqa: E402
+from robot_dog_sim.util import log, require_ros_jazzy, sim_time_to_stamp, try_step  # noqa: E402
 
 policies = sorted(glob.glob(os.path.join(HERE, 'policies', '*', 'policy.json')))
 parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
@@ -75,8 +75,7 @@ def make_ros_node(buffer, lock):
 
 def odom_message(Odometry, runner, t):
     msg = Odometry()
-    msg.header.stamp.sec = int(t)
-    msg.header.stamp.nanosec = int(round((t - int(t)) * 1e9)) % 1000000000
+    msg.header.stamp.sec, msg.header.stamp.nanosec = sim_time_to_stamp(t)
     msg.header.frame_id, msg.child_frame_id = 'odom', 'base_link'
     p, q = runner.base_pos.tolist(), runner.base_quat.tolist()  # q is wxyz
     msg.pose.pose.position.x, msg.pose.pose.position.y, msg.pose.pose.position.z = p
@@ -107,10 +106,12 @@ def main():
     try_step('clock / joint states', lambda: (ros_graph.clock_graph(stage),
                                               ros_graph.joint_state_graph(stage, art_path, '/joint_states')))
     try_step('IMU -> /imu', lambda: ros_graph.imu_graph(stage, sensors.create_imu(stage, base_path, IMU_XYZ)))
-    if not try_step('LiDAR -> /scan', lambda: ros_graph.lidar_graph(
-            stage, *sensors.create_lidar(stage, base_path, LASER_XYZ))):
-        log('navigation needs the LiDAR; exiting')
+    lidar = []
+    if not try_step('LiDAR -> /scan', lambda: lidar.extend(sensors.create_lidar(stage, base_path, LASER_XYZ))) \
+            or lidar[1] != 'laser_scan':
+        log('navigation needs a 2D LiDAR on /scan (got %s); exiting' % (lidar[2] if lidar else 'none'))
         return 1
+    try_step('LiDAR graph', lambda: ros_graph.lidar_graph(stage, *lidar))
     if args.no_camera:
         log('camera disabled (--no-camera)')
     else:

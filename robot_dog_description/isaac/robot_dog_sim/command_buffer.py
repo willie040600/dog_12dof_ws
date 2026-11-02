@@ -14,7 +14,9 @@ class CommandBuffer:
         self._stamp = None
 
     def update(self, cmd, t):
-        self._cmd = tuple(min(max(float(c), lo), hi) for c, (lo, hi) in zip(cmd, self._ranges))
+        # non-finite components (a malformed Twist) become 0 instead of reaching the policy
+        self._cmd = tuple(min(max(float(c), lo), hi) if math.isfinite(c) else 0.0
+                          for c, (lo, hi) in zip(cmd, self._ranges))
         self._stamp = t
 
     def get(self, t):

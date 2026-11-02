@@ -28,3 +28,17 @@ def test_try_step_reports_ok_and_failed(capsys):
     out = capsys.readouterr().out
     assert "good" in out and "ok" in out
     assert "bad" in out and "FAILED" in out
+
+
+def test_sim_time_to_stamp_never_jumps_back():
+    from robot_dog_sim.util import sim_time_to_stamp
+
+    assert sim_time_to_stamp(2.9999999999996) == (3, 0)  # rounding to 1e9 ns must carry into seconds
+    assert sim_time_to_stamp(1.25) == (1, 250000000)
+    assert sim_time_to_stamp(0.0) == (0, 0)
+    t, last = 0.0, (0, 0)
+    for _ in range(20000):  # 0.005 s steps accumulated in floating point, as in the simulator
+        t += 0.005
+        s = sim_time_to_stamp(t)
+        assert s > last
+        last = s

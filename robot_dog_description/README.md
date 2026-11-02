@@ -164,7 +164,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 | `--world <USD>` | 載入其他場景取代內建房間 |
 | `--max-frames N` | 跑 N 個策略步後結束（smoke test） |
 
-- 發佈 `/clock`、`/joint_states`、`/imu`、`/scan`（10 Hz）、`/camera/image_raw`（約 16 Hz）、`/odom_gt`（真值，`odom→base_link`，50 Hz）；
+- 發佈 `/clock`、`/joint_states`、`/imu`、`/scan`（10 Hz）、`/camera/image_raw`（約 14 Hz）、`/odom_gt`（真值，`odom→base_link`，50 Hz）；
   **不發佈 TF**（由 bridge.launch.py 負責）。
 - `/cmd_vel` 0.5 s 沒更新就視為 0；指令夾在訓練範圍（vx ±0.8、vy ±0.5、wz ±1.0）。
 - 實測（v8）：前進/側移 0.3 m/s 5 秒走 1.44 / 1.47 m，轉 0.8 rad/s 5 秒 3.9 rad，停送指令 1 s 內停穩，零指令 10 s 漂移 0。

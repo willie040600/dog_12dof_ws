@@ -1,5 +1,6 @@
 """Run in the Isaac Lab uv env (needs torch and isaaclab)."""
 import copy
+import glob
 import math
 import os
 
@@ -11,12 +12,13 @@ from robot_dog_sim.observations import (build_observation, check_obs_terms, join
                                         quat_rotate_inverse_wxyz)
 from robot_dog_sim.policy_meta import PolicyMetaError, load_policy_meta
 
-V7 = os.path.join(os.path.dirname(__file__), '..', 'policies', '2026-11-01_20-43-36_v7', 'policy.json')
+# the newest committed policy (the folder name changes when the policy is replaced)
+POLICY = sorted(glob.glob(os.path.join(os.path.dirname(__file__), '..', 'policies', '*', 'policy.json')))[-1]
 
 
 @pytest.fixture
 def meta():
-    return load_policy_meta(V7)
+    return load_policy_meta(POLICY)
 
 
 def test_rotate_inverse_matches_isaac_lab():

@@ -33,7 +33,7 @@ from isaacsim.core.experimental.prims import Articulation  # noqa: E402
 
 from robot_dog_sim import kit, world  # noqa: E402
 from robot_dog_sim.observations import quat_rotate_inverse_wxyz  # noqa: E402
-from robot_dog_sim.parity import SEGMENTS, command_at, compare, segment_means, total_steps  # noqa: E402
+from robot_dog_sim.parity import SEGMENTS, command_at, compare, segment_means, total_steps, verdict  # noqa: E402
 from robot_dog_sim.policy_meta import load_policy_meta  # noqa: E402
 from robot_dog_sim.policy_runner import PolicyRunner  # noqa: E402
 from robot_dog_sim.robot import (apply_policy_dof_settings, author_policy_physics, convert_urdf,  # noqa: E402
@@ -87,12 +87,15 @@ def main():
             % (label, *cmd, *r, *g))
     failures = compare(ref['means'], got)
     if fallen_at is not None:
-        log('note: base below 0.12 m or tilted > 60 deg first at t=%.2f s' % fallen_at)
+        log('PARITY FAIL Isaac Sim: base below 0.12 m or tilted > 60 deg first at t=%.2f s' % fallen_at)
+    if ref.get('falls', 0):
+        log('PARITY FAIL Isaac Lab reference: %d fall(s)' % ref['falls'])
     for msg in failures:
         log('PARITY FAIL ' + msg)
+    ok = verdict(failures, fallen_at is not None, ref.get('falls', 0))
     log('parity %s: %d/%d segments within 0.05 m/s / 0.1 rad/s' % (
-        'PASS' if not failures else 'FAIL', len(SEGMENTS) - len(failures), len(SEGMENTS)))
-    return 0 if not failures else 1
+        'PASS' if ok else 'FAIL', len(SEGMENTS) - len(failures), len(SEGMENTS)))
+    return 0 if ok else 1
 
 
 exit_code = 1

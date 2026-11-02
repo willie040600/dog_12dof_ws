@@ -32,3 +32,12 @@ def test_compare_boundaries():
     bad = compare(ref, [(0.351, 0.0, 0.0)] + [(0.3, 0.0, 0.0)] * (len(SEGMENTS) - 1))
     assert len(bad) == 1 and SEGMENTS[0][0] in bad[0]
     assert len(compare(ref, [(0.3, 0.0, 0.101)] * len(SEGMENTS))) == len(SEGMENTS)
+
+
+def test_verdict_requires_no_falls():
+    from robot_dog_sim.parity import verdict
+
+    assert verdict([], sim_fallen=False, ref_falls=0)
+    assert not verdict([], sim_fallen=True, ref_falls=0)
+    assert not verdict([], sim_fallen=False, ref_falls=1)
+    assert not verdict(['forward 0.3: ...'], sim_fallen=False, ref_falls=0)

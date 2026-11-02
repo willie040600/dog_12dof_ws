@@ -57,3 +57,10 @@ def test_hold_waits_until_the_body_is_still():
     assert h.update((0.0, 0.0, 0.0), 0.5, speed=(0.20, 0.0)) is False
     assert h.update((0.0, 0.0, 0.0), 0.6, speed=(0.01, 0.30)) is False
     assert h.update((0.0, 0.0, 0.0), 0.7, speed=(0.01, 0.02)) is True
+
+
+def test_non_finite_command_components_become_zero():
+    # a malformed Twist must not push NaN into the policy and the torques
+    b = CommandBuffer(RANGES)
+    b.update((float('nan'), 0.2, float('inf')), 0.0)
+    assert b.get(0.1) == (0.0, 0.2, 0.0)

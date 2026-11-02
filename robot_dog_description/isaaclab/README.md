@@ -93,16 +93,18 @@ uv run --extra isaacsim python $S/stand_test.py
 
 ## 目前採用的策略
 
-`robot_dog_description/isaac/policies/2026-11-01_20-43-36_v7/`（`model_2450.pt`），`gait_eval` **17/17**：
-（評估用標準機器人：不隨機化機身質量與質心，seed 42）
+`robot_dog_description/isaac/policies/2026-11-02_12-15-26_v8/`（`model_3200.pt`），`gait_eval` **17/17**：
+（評估用標準機器人：不隨機化機身質量與質心，seed 42；機身高度每個情境都在 0.222–0.231 m）
 
 | 情境 | 指令 | 實際 |
 |---|---|---|
-| 前後 | ±0.1 / ±0.3 / ±0.5 m/s | +0.102 −0.102 / +0.311 −0.310 / +0.519 −0.511 |
-| 側移 | ±0.1 / ±0.3 m/s | +0.096 −0.092 / +0.326 −0.311 |
-| 轉向 | ±0.2 / ±0.5 / ±0.8 rad/s | +0.206 −0.191 / +0.525 −0.512 / +0.821 −0.813 |
-| 站立 | 0，10 秒 | 漂移 0.002 m |
+| 前後 | ±0.1 / ±0.3 / ±0.5 m/s | +0.101 −0.085 / +0.307 −0.308 / +0.506 −0.510 |
+| 側移 | ±0.1 / ±0.3 m/s | +0.101 −0.077 / +0.320 −0.301 |
+| 轉向 | ±0.2 / ±0.5 / ±0.8 rad/s | +0.191 −0.114 / +0.499 −0.495 / +0.809 −0.804 |
+| 站立 | 0，10 秒 | 漂移 0.009 m |
 | 跌倒 | — | 0 |
+
+最弱的是慢速右轉（−0.2 → −0.114，誤差 0.086，門檻 0.1）。Isaac Sim 一致性測試（`policy_parity.py`）10 段都在 0.02 m/s 內。
 
 實際的訓練過程（每一版都從上一版接著訓練 1000 iterations，每次只改一件事）：
 
@@ -111,10 +113,24 @@ uv run --extra isaacsim python $S/stand_test.py
 | v4 | 從頭訓練；armature 0.01、std 0.5、`feet_air_time` 門檻 0.2 s | 會走，但 ±0.1 m/s 站著不動 |
 | v5 | std 0.25 | 0.3～0.5 更準，死區還在 |
 | v6 | `feet_air_time_any_motion`（抬腳獎勵也看小指令與轉向） | 死區還在 |
-| v7 | 25% 單一軸小指令（`RobotDogVelocityCommand`） | 17/17；21 個 checkpoint 中 13 個 17/17，取平均相對誤差最小的 `model_2450` |
+| v7 | 25% 單一軸小指令（`RobotDogVelocityCommand`） | 速度 17/17，但**趴著爬**（機身約 0.09 m），加了高度判準後 0/17 |
+| v8 | `base_height_l2`（目標 0.23 m，權重 −50），從 v7/`model_2450` 接著訓練 | 17/17，站高約 0.226 m；21 個 checkpoint 中 16 個 ≥ 15/17，取 `model_3200` |
 
 用目前的設定從頭重現：照上面「訓練」一節的兩階段指令（第 1 階段 std 0.5）。這條路徑本身還沒有完整跑過一次，
-重訓後請用 `gait_eval` 確認；要挑同一個 run 裡最好的 checkpoint，可以每個都匯出到暫存資料夾再評估。
+重訓後請用 `gait_eval` 確認。挑同一個 run 裡最好的 checkpoint：
+
+```bash
+uv run --extra isaacsim python $S/rank_checkpoints.py --run_dir ~/IsaacLab/logs/rsl_rl/robot_dog_flat/<run>
+uv run --extra isaacsim python $S/export_policy.py --run_dir <同上> --checkpoint <BEST 那一行的 model_N.pt>
+```
+
+換了策略之後，重做 Isaac Sim 一致性測試（Isaac Lab 參考 → Isaac Sim 比對）：
+
+```bash
+P=~/dog_12dof_ws/robot_dog_description/isaac/policies/<run>
+uv run --extra isaacsim python $S/parity_reference.py --policy_dir $P --out $P/parity_reference.json
+uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/policy_parity.py --policy $P --reference $P/parity_reference.json --headless
+```
 
 策略的關節順序（`policy.json` 的 `joint_names`）是 **4 個 hip → 4 個 thigh → 4 個 calf**（FL、FR、RL、RR），
 不是 ROS 控制器的「每條腿 hip/thigh/calf」順序，所以 Isaac Sim / ROS 端一律依名稱對應。
@@ -127,6 +143,7 @@ uv run --extra isaacsim python $S/stand_test.py
   - `heading_command=False`：wz 直接取樣（Nav2 直接送 wz）
   - 零指令環境 10%：學會站著不動
   - 速度追蹤獎勵 `std` 0.25（第 1 階段覆寫成 0.5）：Nav2 常送 0.05～0.2 的小指令，低速也要追準
+  - `base_height_l2`（目標 0.23 m，權重 −50）：沒有它時策略會壓低機身趴著爬（v7）；`gait_eval` 也要求平均高度 ≥ 0.18 m
   - `feet_air_time` 門檻 0.5 → 0.2 s：這隻狗每步騰空不到 0.5 s，預設值會讓每一步都扣分，策略學成站著不動
   - `feet_air_time` 改成 `feet_air_time_any_motion`（`velocity/mdp.py`）：`|cmd_xy| > 0.05` 或 `|wz| > 0.05` 就給抬腳獎勵；
     Isaac Lab 原版只看 `|cmd_xy| > 0.1`，0.1 m/s 和原地轉向的指令因此學成站著不動
