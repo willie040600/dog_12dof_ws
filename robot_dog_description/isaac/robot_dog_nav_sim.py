@@ -21,7 +21,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from robot_dog_sim.robot_spec import (CAMERA_HFOV, CAMERA_SIZE, CAMERA_XYZ, DEFAULT_URDF, IMU_XYZ,  # noqa: E402
-                                      LASER_XYZ)
+                                      LASER_XYZ, LIDAR_RANGE)
 from robot_dog_sim.util import log, require_ros_jazzy, sim_time_to_stamp, try_step  # noqa: E402
 
 policies = sorted(glob.glob(os.path.join(HERE, 'policies', '*', 'policy.json')))
@@ -111,7 +111,7 @@ def main():
                                               ros_graph.joint_state_graph(stage, art_path, '/joint_states')))
     try_step('IMU -> /imu', lambda: ros_graph.imu_graph(stage, sensors.create_imu(stage, base_path, IMU_XYZ)))
     lidar = []
-    if not try_step('LiDAR -> /scan', lambda: lidar.extend(sensors.create_lidar(stage, base_path, LASER_XYZ))) \
+    if not try_step('LiDAR -> /scan', lambda: lidar.extend(sensors.create_lidar(stage, base_path, LASER_XYZ, LIDAR_RANGE))) \
             or lidar[1] != 'laser_scan':
         log('navigation needs a 2D LiDAR on /scan (got %s); exiting' % (lidar[2] if lidar else 'none'))
         return 1

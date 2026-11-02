@@ -37,6 +37,14 @@ def create_camera(stage, base_path, xyz, hfov, size):
     return path
 
 
+def _set_range(prim, near, far):
+    for name, value in (('omni:sensor:Core:nearRangeM', near), ('omni:sensor:Core:farRangeM', far)):
+        attr = prim.GetAttribute(name)
+        if not attr.IsValid():
+            raise RuntimeError('lidar has no %s attribute' % name)
+        attr.Set(float(value))
+
+
 def _rtx_lidar(stage, path, config, xyz):
     try:  # Isaac Sim 6.x API
         from isaacsim.sensors.experimental.rtx import Lidar
@@ -49,11 +57,16 @@ def _rtx_lidar(stage, path, config, xyz):
         raise RuntimeError('no lidar prim at %s' % path)
 
 
-def create_lidar(stage, base_path, xyz):
-    """Planar RTX LiDAR -> (prim path, 'laser_scan', '/scan'); falls back to a 3D one on /scan/points."""
+def create_lidar(stage, base_path, xyz, range_m=None):
+    """Planar RTX LiDAR -> (prim path, 'laser_scan', '/scan'); falls back to a 3D one on /scan/points.
+
+    range_m = (near, far) overrides the profile's omni:sensor:Core:nearRangeM / farRangeM.
+    """
     path = base_path + '/laser'
     try:
         _rtx_lidar(stage, path, 'Example_Rotary_2D', xyz)
+        if range_m is not None:
+            _set_range(stage.GetPrimAtPath(path), *range_m)
         return path, 'laser_scan', '/scan'
     except Exception as e:
         log('2D lidar config unavailable (%s); using Example_Rotary -> PointCloud2 on /scan/points' % e)

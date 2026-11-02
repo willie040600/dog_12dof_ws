@@ -10,5 +10,7 @@ LASER_XYZ = (0.08, 0.0, 0.085)
 CAMERA_XYZ = (0.178, 0.0, 0.0575)
 CAMERA_HFOV = 1.204  # rad, same as Gazebo
 CAMERA_SIZE = (640, 480)
+# navigation-mode 2D LiDAR range (m); the RTX Example_Rotary_2D profile starts at 1.0 m, blind next to walls
+LIDAR_RANGE = (0.15, 15.0)
 
 DEFAULT_URDF = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'urdf', 'robot_dog_rl.urdf'))
