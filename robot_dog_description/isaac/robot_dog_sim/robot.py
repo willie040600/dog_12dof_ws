@@ -80,3 +80,52 @@ def configure_drives(joints, kp, kd, max_effort, max_velocity, stand):
             if hasattr(state, attr):
                 getattr(state, attr)(q / DEG)
                 break
+
+
+def author_policy_physics(root, art_prim, meta):
+    """USD side, before the timeline plays: rigid-body and articulation solver settings from policy.json."""
+    rb = meta['rigid_body']
+    for prim in Usd.PrimRange(root):
+        if prim.HasAPI(UsdPhysics.RigidBodyAPI):
+            api = PhysxSchema.PhysxRigidBodyAPI.Apply(prim)
+            api.CreateMaxDepenetrationVelocityAttr(rb['max_depenetration_velocity'])
+            api.CreateLinearDampingAttr(rb['linear_damping'])
+            api.CreateAngularDampingAttr(rb['angular_damping'])
+            api.CreateMaxLinearVelocityAttr(rb['max_linear_velocity'])
+            api.CreateMaxAngularVelocityAttr(rb['max_angular_velocity'])  # Isaac Lab writes it unconverted
+    px = meta['physx']
+    art = PhysxSchema.PhysxArticulationAPI.Apply(art_prim)
+    art.CreateSolverPositionIterationCountAttr(px['solver_position_iterations'])
+    art.CreateSolverVelocityIterationCountAttr(px['solver_velocity_iterations'])
+    art.CreateEnabledSelfCollisionsAttr(px['self_collisions'])
+
+
+def apply_policy_dof_settings(articulation, meta, dof_indices):
+    """Tensor side, after the timeline plays: torque-driven joints, armature, limits, friction, start pose.
+
+    dof_indices maps the policy's joint order to the articulation's (observations.joint_index_map).
+    """
+    import warp as wp
+
+    act = meta['actuator']
+    n = len(dof_indices)
+    articulation.set_dof_drive_types('force', dof_indices=dof_indices)
+    articulation.set_dof_gains([[0.0] * n], [[0.0] * n], dof_indices=dof_indices)  # torques come from actuator.py
+    articulation.set_dof_armatures([[act['armature']] * n], dof_indices=dof_indices)
+    articulation.set_dof_max_efforts([[act['effort_limit']] * n], dof_indices=dof_indices)
+    articulation.set_dof_max_velocities([[act['velocity_limit']] * n], dof_indices=dof_indices)
+    # robot friction on every collision shape, as Isaac Lab's physics_material event does
+    view = articulation._physics_articulation_view
+    mat = wp.to_torch(view.get_material_properties()).clone()
+    r = meta['materials']['robot']
+    mat[..., 0], mat[..., 1], mat[..., 2] = r['static_friction'], r['dynamic_friction'], r['restitution']
+    view.set_material_properties(wp.from_torch(mat.contiguous()), wp.array([0], dtype=wp.int32))
+    reset_pose(articulation, meta, dof_indices)
+
+
+def reset_pose(articulation, meta, dof_indices):
+    """Standing pose at the spawn height, at rest (Isaac Lab's reset with the eval env's zero ranges)."""
+    articulation.set_world_poses(positions=[[0.0, 0.0, meta['spawn_height']]], orientations=[[1.0, 0.0, 0.0, 0.0]])
+    articulation.set_velocities(linear_velocities=[[0.0, 0.0, 0.0]], angular_velocities=[[0.0, 0.0, 0.0]])
+    articulation.set_dof_positions([meta['default_joint_pos']], dof_indices=dof_indices)
+    articulation.set_dof_velocities([[0.0] * len(dof_indices)], dof_indices=dof_indices)

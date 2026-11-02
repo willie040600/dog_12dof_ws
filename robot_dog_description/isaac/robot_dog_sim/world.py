@@ -46,3 +46,32 @@ def demo_world(stage, physics_hz):
     static_box(stage, '/World/ground', (0, 0, -0.05), (40, 40, 0.1), (0.6, 0.6, 0.6), friction)
     static_box(stage, '/World/box_obstacle', (1.5, 0.3, 0.25), (0.5, 0.5, 0.5), (0.8, 0.3, 0.2), friction)
     add_lights(stage)
+
+
+def apply_physics_settings(stage, meta):
+    """Physics scene as in training: dt, gravity and the PhysX solver settings from policy.json."""
+    setup_stage(stage, int(round(1.0 / meta['sim_dt'])))
+    scene = PhysxSchema.PhysxSceneAPI.Get(stage, '/World/physicsScene')
+    s = meta['physx_scene']
+    scene.CreateSolverTypeAttr('TGS' if s['solver_type'] == 1 else 'PGS')
+    scene.CreateBounceThresholdAttr(s['bounce_threshold_velocity'])
+    scene.CreateFrictionOffsetThresholdAttr(s['friction_offset_threshold'])
+    scene.CreateFrictionCorrelationDistanceAttr(s['friction_correlation_distance'])
+    scene.CreateEnableStabilizationAttr(s['enable_stabilization'])
+
+
+def policy_ground(stage, meta):
+    """Ground friction material with the training combine modes (the robot side is set on its shapes)."""
+    g = meta['materials']['ground']
+    material = ground_material(stage, g['static_friction'], g['dynamic_friction'], g['restitution'])
+    physx = PhysxSchema.PhysxMaterialAPI.Apply(material.GetPrim())
+    physx.CreateFrictionCombineModeAttr(g['friction_combine_mode'])
+    physx.CreateRestitutionCombineModeAttr(g['restitution_combine_mode'])
+    return material
+
+
+def flat_world(stage, meta):
+    """Training-like scene for the parity test: physics settings, a large ground plane, lights."""
+    apply_physics_settings(stage, meta)
+    static_box(stage, '/World/ground', (0, 0, -0.05), (100, 100, 0.1), (0.6, 0.6, 0.6), policy_ground(stage, meta))
+    add_lights(stage)
