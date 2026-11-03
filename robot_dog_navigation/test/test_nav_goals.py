@@ -1,22 +1,41 @@
 import math
 
-from robot_dog_navigation.nav_goals import GOALS, judge, pose_error, room_layout, sideways_share
+from robot_dog_navigation.nav_goals import (GOALS, clearance, judge, load_truth, pose_error, reachable,
+                                            sideways_share)
 
-ROOM = room_layout()
+BODY = load_truth('apartment_body')
 
 
-def test_goals_are_inside_and_clear():
+def apartment_xy(x, y):
+    """World -> apartment coordinates (the truth map's origin is the apartment's corner)."""
+    return x - BODY[2][0], y - BODY[2][1]
+
+
+def test_goals_are_clear_and_reachable():
     assert len(GOALS) == 5
     for name, x, y, _ in GOALS:
-        assert abs(x) < ROOM.ROOM_HALF and abs(y) < ROOM.ROOM_HALF, name
-        assert ROOM.clearance(x, y) >= 0.5, name
+        assert clearance(BODY, x, y) >= 0.5, name
+        assert reachable(BODY, x, y), name
 
 
-def test_goals_cover_all_zones_and_cross_doorways():
-    zones = [ROOM.zone(x) for _, x, _, _ in GOALS]
-    assert set(zones) == {0, 1, 2}
-    path = [ROOM.zone(0.0)] + zones
-    assert sum(a != b for a, b in zip(path, path[1:])) >= 2
+def test_spawn_is_clear_and_reachable():
+    assert clearance(BODY, 0.0, 0.0) >= 0.5 and reachable(BODY, 0.0, 0.0)
+
+
+def test_goals_cover_three_areas():
+    areas = set()
+    for _, x, y, _ in GOALS:
+        ax, ay = apartment_xy(x, y)
+        areas.add('ldk' if ay < 3.0 else ('master' if ax < 5.0 else 'second'))
+    assert areas == {'ldk', 'master', 'second'}
+
+
+def test_bed_centre_is_unreachable():
+    assert not reachable(BODY, 0.4, 2.7) or clearance(BODY, 0.4, 2.7) < 0.16
+
+
+def test_off_map_is_blocked():
+    assert clearance(BODY, 20.0, 0.0) == 0.0 and not reachable(BODY, 20.0, 0.0)
 
 
 def test_pose_error_wraps_yaw():

@@ -1,12 +1,13 @@
-"""Compare a map_saver map (.yaml + .pgm) with the known room layout (spec M4).
+"""Compare a map_saver map (.yaml + .pgm) with the apartment's truth floor plans (spec 2026-11-03, 4.3).
 
-The dog starts at the world origin, so slam_toolbox's map frame is the world frame: occupied cells should
-lie on the walls and obstacles of robot_dog_sim.room_layout.
+The dog starts at the world origin, so slam_toolbox's map frame is the world frame, the frame the truth maps in
+maps/truth/ are written in (robot_dog_description/isaac/tools/make_floorplan.py).
 """
 import os
 
 import numpy as np
 import yaml
+from scipy import ndimage
 
 
 def _read_pgm(path):
@@ -51,33 +52,50 @@ def occupied_points(grid, resolution, origin):
     return np.stack([origin[0] + (cols + 0.5) * resolution, origin[1] + (rows + 0.5) * resolution], axis=1)
 
 
-def _distance_to_boxes(points, boxes):
-    """Distance of each point to the nearest axis-aligned box (0 inside)."""
-    b = np.asarray(boxes, dtype=float)  # (B, 4) xmin ymin xmax ymax
-    px, py = points[:, :1], points[:, 1:2]
-    dx = np.maximum(np.maximum(b[:, 0] - px, 0.0), px - b[:, 2])
-    dy = np.maximum(np.maximum(b[:, 1] - py, 0.0), py - b[:, 3])
-    return np.hypot(dx, dy).min(axis=1)
+def to_cell(res, origin, x, y):
+    """(row, col) of world point(s) x, y in a grid with this resolution and origin (row 0 = smallest y)."""
+    return (np.floor((np.asarray(y) - origin[1]) / res).astype(int),
+            np.floor((np.asarray(x) - origin[0]) / res).astype(int))
 
 
-def check_map(points, obstacles, tol=0.10, step=0.1, near=0.15):
-    """{'aligned': share of occupied points within tol of an obstacle,
-        'outer_wall_coverage': share of the outer walls' inner faces with an occupied point within `near`}."""
-    boxes = [b for _, b in obstacles]
+def _sample(field, rows, cols, outside):
+    """field[rows, cols], with `outside` where the index is off the grid."""
+    inside = (rows >= 0) & (rows < field.shape[0]) & (cols >= 0) & (cols < field.shape[1])
+    out = np.full(np.shape(rows), outside, dtype=float)
+    out[inside] = field[rows[inside], cols[inside]]
+    return out
+
+
+def reachable_free(truth_body):
+    """Free cells of the body-band truth map connected (4-neighbour) to the cell of the world origin."""
+    grid, res, origin = truth_body
+    labels, _ = ndimage.label(grid == 0)
+    r, c = to_cell(res, origin, 0.0, 0.0)
+    return labels == labels[r, c] if labels[r, c] else np.zeros(grid.shape, bool)
+
+
+def check_map(points, truth_lidar, truth_body, tol=0.10, near=0.15, visible=0.10):
+    """{'aligned': share of map points within tol of an occupied truth cell (LiDAR plane),
+        'coverage': share of the visible truth surface with a map point within near}.
+
+    Visible truth surface: occupied LiDAR-plane cells within `visible` of free space the dog can reach from the
+    origin (body band), so walls' backs and the inside of furniture do not count.
+    """
+    grid, res, origin = truth_lidar
+    if truth_body[0].shape != grid.shape or truth_body[1] != res or tuple(truth_body[2]) != tuple(origin):
+        raise ValueError('the LiDAR and body truth maps must share size, resolution and origin')
     points = np.asarray(points, dtype=float).reshape(-1, 2)
-    aligned = float((_distance_to_boxes(points, boxes) <= tol).mean()) if len(points) else 0.0
-    samples = []
-    for name, (xmin, ymin, xmax, ymax) in obstacles:
-        if name == 'outer_north':
-            samples += [(x, ymin) for x in np.arange(xmin + 0.1, xmax - 0.1, step)]
-        elif name == 'outer_south':
-            samples += [(x, ymax) for x in np.arange(xmin + 0.1, xmax - 0.1, step)]
-        elif name == 'outer_east':
-            samples += [(xmin, y) for y in np.arange(ymin + 0.1, ymax - 0.1, step)]
-        elif name == 'outer_west':
-            samples += [(xmax, y) for y in np.arange(ymin + 0.1, ymax - 0.1, step)]
-    samples = np.array(samples)
     if not len(points):
-        return {'aligned': 0.0, 'outer_wall_coverage': 0.0}
-    d = np.hypot(samples[:, None, 0] - points[None, :, 0], samples[:, None, 1] - points[None, :, 1]).min(axis=1)
-    return {'aligned': aligned, 'outer_wall_coverage': float((d <= near).mean())}
+        return {'aligned': 0.0, 'coverage': 0.0}
+    occupied = grid == 100
+    to_truth = ndimage.distance_transform_edt(~occupied) * res
+    r, c = to_cell(res, origin, points[:, 0], points[:, 1])
+    aligned = float((_sample(to_truth, r, c, np.inf) <= tol).mean())
+    seen = np.zeros(grid.shape, bool)
+    inside = (r >= 0) & (r < grid.shape[0]) & (c >= 0) & (c < grid.shape[1])
+    seen[r[inside], c[inside]] = True
+    to_seen = ndimage.distance_transform_edt(~seen) * res
+    to_free = ndimage.distance_transform_edt(~reachable_free(truth_body)) * res
+    surface = occupied & (to_free <= visible)
+    coverage = float((to_seen[surface] <= near).mean()) if surface.any() else 0.0
+    return {'aligned': aligned, 'coverage': coverage}

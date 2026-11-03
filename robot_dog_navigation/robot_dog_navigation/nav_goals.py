@@ -1,34 +1,53 @@
-"""The five nav_eval goals and how a goal attempt is judged (spec M5). Plain Python."""
+"""The five nav_eval goals in the apartment and how a goal attempt is judged (spec 2026-11-03, 5). Plain Python."""
 import math
 import os
-import sys
 
-# (name, x, y, yaw) in the map frame = world frame (the dog spawns at the origin facing +x)
+from scipy import ndimage
+
+from robot_dog_navigation.map_check import load_map, reachable_free, to_cell
+
+# (name, x, y, yaw) in the map frame = world frame = apartment - (3.5, 1.8); the dog spawns at the origin facing +x
 GOALS = (
-    ('centre north-east', 1.0, 2.0, 0.0),
-    ('east zone via the south doorway', 3.0, -3.0, 0.0),
-    ('east zone north', 3.5, 3.8, math.pi / 2),
-    ('west zone via the north doorway', -3.0, 3.2, math.pi),
-    ('west zone south', -2.6, -4.0, -math.pi / 2),
+    ('living room west', -2.5, -0.3, math.pi),
+    ('master bedroom', -1.5, 3.0, math.pi / 2),
+    ('second bedroom', 3.0, 2.2, 0.0),
+    ('dining and kitchen east', 3.5, -0.3, -math.pi / 2),
+    ('back to the start', 0.0, 0.0, 0.0),
 )
 XY_TOLERANCE, YAW_TOLERANCE = 0.25, 0.3   # m, rad (Nav2's goal checker is a bit tighter)
 
 
-def room_layout():
-    """robot_dog_sim.room_layout from the repo checkout, or from robot_dog_description's installed share."""
-    candidates = [os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'robot_dog_description', 'isaac')]
+def load_truth(name):
+    """(grid, resolution, origin) of maps/truth/<name>.yaml, from the repo checkout or the installed share."""
+    candidates = [os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'maps', 'truth')]
     try:
         from ament_index_python.packages import get_package_share_directory
-        candidates.append(os.path.join(get_package_share_directory('robot_dog_description'), 'isaac'))
+        candidates.append(os.path.join(get_package_share_directory('robot_dog_navigation'), 'maps', 'truth'))
     except Exception:
         pass
     for path in candidates:
-        if os.path.isfile(os.path.join(path, 'robot_dog_sim', 'room_layout.py')):
-            if path not in sys.path:
-                sys.path.insert(0, path)
-            from robot_dog_sim import room_layout as layout
-            return layout
-    raise ImportError('robot_dog_sim/room_layout.py not found in %s' % candidates)
+        yaml_path = os.path.join(path, name + '.yaml')
+        if os.path.isfile(yaml_path):
+            return load_map(yaml_path)
+    raise FileNotFoundError('%s.yaml not found in %s' % (name, candidates))
+
+
+def clearance(truth, x, y):
+    """Distance (m) from (x, y) to the nearest occupied truth cell; 0 on one or off the map."""
+    grid, res, origin = truth
+    r, c = to_cell(res, origin, x, y)
+    if not (0 <= r < grid.shape[0] and 0 <= c < grid.shape[1]):
+        return 0.0
+    return float(ndimage.distance_transform_edt(grid != 100)[r, c] * res)
+
+
+def reachable(truth, x, y):
+    """True when (x, y) is in the free space connected to the world origin."""
+    grid, res, origin = truth
+    r, c = to_cell(res, origin, x, y)
+    if not (0 <= r < grid.shape[0] and 0 <= c < grid.shape[1]):
+        return False
+    return bool(reachable_free(truth)[r, c])
 
 
 def pose_error(goal, x, y, yaw):

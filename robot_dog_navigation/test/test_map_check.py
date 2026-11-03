@@ -1,37 +1,44 @@
 import numpy as np
 
 from robot_dog_navigation.map_check import check_map, load_map, occupied_points
-from robot_dog_navigation.nav_goals import room_layout
 
-ROOM = room_layout()
-RES = 0.05
+RES, ORIGIN = 0.05, (-1.0, -1.0)   # 2 x 2 m, the world origin in the middle
 
 
-def _synthetic_points(keep=lambda name: True):
-    xs = np.arange(-5.5, 5.5, RES) + RES / 2
-    pts = []
-    for name, box in ROOM.obstacles():
-        if not keep(name):
-            continue
-        for x in xs:
-            for y in xs:
-                if ROOM.box_distance(x, y, box) <= RES / 2:
-                    pts.append((x, y))
-    return np.array(pts)
+def room(block_filled=True):
+    """Synthetic truth: four walls around a 2 x 2 m room and a 0.4 m block east of the origin."""
+    g = np.zeros((40, 40), np.int8)
+    g[0, :] = g[-1, :] = g[:, 0] = g[:, -1] = 100
+    if block_filled:
+        g[16:24, 28:36] = 100
+    else:
+        g[16:24, 28] = g[16:24, 35] = g[16, 28:36] = g[23, 28:36] = 100
+    return g, RES, ORIGIN
 
 
-def test_true_layout_passes():
-    r = check_map(_synthetic_points(), ROOM.obstacles())
-    assert r['aligned'] > 0.99 and r['outer_wall_coverage'] > 0.95
+def points_of(grid):
+    return occupied_points(grid, RES, ORIGIN)
+
+
+def test_truth_itself_passes():
+    r = check_map(points_of(room()[0]), room(), room())
+    assert r['aligned'] > 0.99 and r['coverage'] > 0.95
 
 
 def test_shifted_map_is_not_aligned():
-    assert check_map(_synthetic_points() + [0.3, 0.3], ROOM.obstacles())['aligned'] < 0.5
+    assert check_map(points_of(room()[0]) + [0.3, 0.3], room(), room())['aligned'] < 0.5
 
 
-def test_missing_outer_walls_lower_coverage():
-    r = check_map(_synthetic_points(lambda n: n not in ('outer_north', 'outer_east')), ROOM.obstacles())
-    assert 0.4 < r['outer_wall_coverage'] < 0.6
+def test_missing_wall_lowers_coverage():
+    g = room()[0].copy()
+    g[-1, :] = 0                                  # the north wall never seen
+    assert 0.6 < check_map(points_of(g), room(), room())['coverage'] < 0.9
+
+
+def test_hidden_surfaces_do_not_count():
+    # the map only has the block's outline, the truth has it filled: its inside is not visible from free space
+    r = check_map(points_of(room(block_filled=False)[0]), room(), room())
+    assert r['coverage'] > 0.95 and r['aligned'] > 0.99
 
 
 def test_load_map_values_and_row_order(tmp_path):
