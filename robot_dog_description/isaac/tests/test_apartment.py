@@ -17,7 +17,15 @@ def test_texture_folder_complete():
 
 
 def test_wants_collision():
-    assert apartment.wants_collision('/World/scene/Walls_Group/Wall_01/Wall_01', True)
-    assert not apartment.wants_collision('/World/scene/Ceiling_Group/Ceiling/Ceiling', True)
-    assert not apartment.wants_collision('/World/scene/Decor_Group/Lamp/Lamp', False)
-    assert apartment.wants_collision('/World/scene/Furniture_Group/Ceiling_Group_lookalike/Mesh', True)
+    z = (0.0, 0.8)
+    assert apartment.wants_collision('/World/scene/Walls_Group/Wall_01/Wall_01', True, z)
+    assert not apartment.wants_collision('/World/scene/Ceiling_Group/Ceiling/Ceiling', True, z)
+    assert not apartment.wants_collision('/World/scene/Decor_Group/Lamp/Lamp', False, z)
+    assert apartment.wants_collision('/World/scene/Furniture_Group/Ceiling_Group_lookalike/Mesh', True, z)
+
+
+def test_flat_decor_on_the_floor_does_not_collide():
+    # the 8 mm living-room rug: its edge is a step the policy (trained on flat ground) cannot climb
+    assert not apartment.wants_collision('/World/scene/Decor_Group/Rug_Living/Rug_Living', True, (0.0, 0.008))
+    assert apartment.wants_collision('/World/scene/Floors_Group/Floor_LDK/Floor_LDK', True, (-0.1, 0.0))
+    assert apartment.wants_collision('/World/scene/Bath_Group/ShowerTray_Body/ShowerTray_Body', True, (0.0, 0.05))

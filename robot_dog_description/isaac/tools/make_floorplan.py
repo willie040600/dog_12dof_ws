@@ -26,6 +26,7 @@ EXTENT = (0.0, 0.0, 10.0, 6.0)  # the apartment's floor, in its own coordinates 
 def world_triangles(stage):
     """(N, 3, 3) triangles of the colliding meshes, in world coordinates with the spawn point at the origin."""
     xc = UsdGeom.XformCache()
+    bounds = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])
     hidden = set()
     tris = []
     for prim in stage.Traverse():
@@ -35,7 +36,8 @@ def world_triangles(stage):
             continue
         path = prim.GetPath().pathString
         visible = UsdGeom.Imageable(prim).ComputeVisibility() != UsdGeom.Tokens.invisible
-        if not apartment.wants_collision(path, visible):
+        box = bounds.ComputeWorldBound(prim).ComputeAlignedRange()
+        if not apartment.wants_collision(path, visible, (box.GetMin()[2], box.GetMax()[2])):
             continue
         mesh = UsdGeom.Mesh(prim)
         points = np.array(mesh.GetPointsAttr().Get() or [], dtype=float)

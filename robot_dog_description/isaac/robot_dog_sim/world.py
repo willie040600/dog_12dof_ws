@@ -82,9 +82,10 @@ def flat_world(stage, meta):
 
 
 def add_static_collision(stage, root_path, material):
-    """Static triangle-mesh collision and the physics material on every visible mesh under root_path.
+    """Static triangle-mesh collision and the physics material on every mesh under root_path that wants it.
 
-    The HIDDEN groups are made invisible first and get no collision. Everything is authored on this stage,
+    The HIDDEN groups are made invisible first; they and flat decor on the floor get no collision
+    (apartment.wants_collision). Everything is authored on this stage,
     so a referenced USD file is not changed. Returns the number of meshes given collision.
     """
     root = stage.GetPrimAtPath(root_path)
@@ -92,11 +93,13 @@ def add_static_collision(stage, root_path, material):
         if prim.GetName() in apartment.HIDDEN:
             UsdGeom.Imageable(prim).MakeInvisible()
     count = 0
+    bounds = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])
     for prim in Usd.PrimRange(root):
         if prim.GetTypeName() != 'Mesh':
             continue
         visible = UsdGeom.Imageable(prim).ComputeVisibility() != UsdGeom.Tokens.invisible
-        if not apartment.wants_collision(prim.GetPath().pathString, visible):
+        box = bounds.ComputeWorldBound(prim).ComputeAlignedRange()
+        if not apartment.wants_collision(prim.GetPath().pathString, visible, (box.GetMin()[2], box.GetMax()[2])):
             continue
         UsdPhysics.CollisionAPI.Apply(prim)
         UsdPhysics.MeshCollisionAPI.Apply(prim).CreateApproximationAttr('none')

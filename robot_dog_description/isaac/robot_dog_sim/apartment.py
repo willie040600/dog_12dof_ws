@@ -11,11 +11,18 @@ SPAWN_XY = (3.5, 1.8)        # living room, between the sofa and the TV stand (0
 LIDAR_HEIGHT = 0.31          # standing base height 0.226 m + laser_joint 0.085 m
 BODY_BAND = (0.03, 0.35)     # heights that block the dog's body
 HIDDEN = ('Ceiling_Group',)  # not shown and not collided with (lets the sun in, top view in the GUI)
+FLAT_TOP = 0.02              # flat decor lying on the floor (the 8 mm rug) is walked over, not collided with:
+                             # its edge is a step the policy, trained on flat ground, cannot climb
 
 
-def wants_collision(path, visible):
-    """True for a mesh that should collide: visible and not under a HIDDEN group."""
-    return visible and not any(name in path.split('/') for name in HIDDEN)
+def wants_collision(path, visible, z_range):
+    """True for a mesh that should collide: visible, not under a HIDDEN group, and not flat decor on the floor.
+
+    z_range: (bottom, top) of the mesh in world z. Floor slabs reach below 0 and still collide.
+    """
+    if not visible or any(name in path.split('/') for name in HIDDEN):
+        return False
+    return not (z_range[0] >= -1e-3 and z_range[1] <= FLAT_TOP)
 
 
 def missing_textures(usd_path):
