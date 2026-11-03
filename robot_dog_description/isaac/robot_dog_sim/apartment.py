@@ -13,6 +13,7 @@ BODY_BAND = (0.03, 0.35)     # heights that block the dog's body
 # not shown and not collided with: the ceiling (lets the sun in, top view in the GUI) and the four door leaves and
 # handles (they stood open into the rooms and hid walls from the LiDAR; the frames stay)
 HIDDEN = ('Ceiling_Group',) + tuple('%s_Door_0%d' % (part, i) for part in ('Leaf', 'Handle') for i in range(1, 5))
+VIEW_EYE, VIEW_TARGET = (1.418, -3.166, 9.121), (1.503, 1.738, 0.0)  # GUI start view, picked in the GUI
 FLAT_TOP = 0.02              # flat decor lying on the floor (the 8 mm rug) is walked over, not collided with:
                              # its edge is a step the policy, trained on flat ground, cannot climb
 

@@ -48,7 +48,7 @@ simulation_app = SimulationApp({'headless': args.headless})
 
 from isaacsim.core.experimental.prims import Articulation  # noqa: E402
 
-from robot_dog_sim import kit, ros_graph, sensors, world  # noqa: E402
+from robot_dog_sim import apartment, kit, ros_graph, sensors, world  # noqa: E402
 from robot_dog_sim.command_buffer import CommandBuffer  # noqa: E402
 from robot_dog_sim.observations import quat_rotate_inverse_wxyz  # noqa: E402
 from robot_dog_sim.policy_meta import load_policy_meta  # noqa: E402
@@ -100,6 +100,8 @@ def main():
         log('world %s: %d collision meshes' % (args.world, world.usd_world(stage, meta, args.world)))
     else:
         log('apartment: %d collision meshes' % world.apartment_world(stage, meta))
+        if not args.headless:
+            try_step('viewport start view', lambda: world.set_view(apartment.VIEW_EYE, apartment.VIEW_TARGET))
     root = load_robot(stage, simulation_app, convert_urdf(DEFAULT_URDF, args.usd_dir), meta['spawn_height'])
     art_prim, base, joints = robot_parts(root)
     author_policy_physics(root, art_prim, meta)

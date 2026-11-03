@@ -42,3 +42,8 @@ def test_door_leaves_and_handles_are_removed():
     assert apartment.wants_collision(details % (casing, casing), True, (0.0, 2.1))
     assert apartment.wants_collision('/World/scene/asset/Furniture_Group/Wardrobe_Door_1/Wardrobe_Door_1', True,
                                      (0.0, 2.0))
+
+
+def test_gui_start_view():
+    # picked in the GUI (above the living room, looking north over the whole apartment), world coordinates
+    assert apartment.VIEW_EYE == (1.418, -3.166, 9.121) and apartment.VIEW_TARGET == (1.503, 1.738, 0.0)

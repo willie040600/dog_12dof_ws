@@ -130,3 +130,9 @@ def apartment_world(stage, meta):
     static_box(stage, '/World/ground', (0.0, 0.0, -0.052), (40.0, 40.0, 0.1), (0.6, 0.6, 0.6),
                policy_ground(stage, meta))
     return count
+
+
+def set_view(eye, target, camera='/OmniverseKit_Persp'):
+    """Point the GUI viewport's perspective camera from eye at target (world coordinates)."""
+    from isaacsim.core.rendering_manager import ViewportManager
+    ViewportManager.set_camera_view(camera, eye=list(eye), target=list(target))
