@@ -56,7 +56,9 @@ def main():
         c = p[name][name]['ros__parameters']
         c.pop('robot_radius', None)
         c['footprint'] = FOOTPRINT
-        c['inflation_layer']['inflation_radius'] = 0.35
+        # steep fall-off (MPPI's recommendation): the apartment's 0.8 m doorways are within 0.40 m of a jamb
+        # everywhere, and with the default 3.0 every way through cost so much that MPPI stopped in front of them
+        c['inflation_layer'].update(inflation_radius=0.35, cost_scaling_factor=10.0)
         layer = c['voxel_layer'] if 'voxel_layer' in c else c['obstacle_layer']
         layer['scan']['topic'] = '/scan_filtered'
 
