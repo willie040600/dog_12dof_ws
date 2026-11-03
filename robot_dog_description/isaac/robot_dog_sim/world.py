@@ -111,17 +111,22 @@ def add_static_collision(stage, root_path, material):
 def usd_world(stage, meta, usd_path, offset_xy=(0.0, 0.0)):
     """Training physics, a USD scene shifted by -offset_xy with static collision on its meshes, and lights."""
     apply_physics_settings(stage, meta)
-    scene = stage.DefinePrim('/World/scene', 'Xform')
-    scene.GetReferences().AddReference(os.path.abspath(usd_path))
-    UsdGeom.Xformable(scene).AddTranslateOp().Set(Gf.Vec3d(-offset_xy[0], -offset_xy[1], 0.0))
+    # the shift goes on a parent of the reference: the referenced root may have its own xformOp:translate
+    scene = UsdGeom.Xform.Define(stage, '/World/scene')
+    scene.AddTranslateOp().Set(Gf.Vec3d(-offset_xy[0], -offset_xy[1], 0.0))
+    stage.DefinePrim('/World/scene/asset', 'Xform').GetReferences().AddReference(os.path.abspath(usd_path))
     count = add_static_collision(stage, '/World/scene', policy_ground(stage, meta))
     add_lights(stage)
     return count
 
 
 def apartment_world(stage, meta):
-    """The MUJI apartment, shifted so its spawn point is the world origin (spec 2026-11-03)."""
+    """The MUJI apartment, shifted so its spawn point is the world origin (spec 2026-11-03), on a ground plane."""
     missing = apartment.missing_textures(apartment.USD)
     if missing:
         raise RuntimeError('%s: %d textures missing next to it, e.g. %s' % (apartment.USD, len(missing), missing[0]))
-    return usd_world(stage, meta, apartment.USD, apartment.SPAWN_XY)
+    count = usd_world(stage, meta, apartment.USD, apartment.SPAWN_XY)
+    # ground outside (the front door opens onto nothing otherwise), 2 mm below the floors so they do not z-fight
+    static_box(stage, '/World/ground', (0.0, 0.0, -0.052), (40.0, 40.0, 0.1), (0.6, 0.6, 0.6),
+               policy_ground(stage, meta))
+    return count
