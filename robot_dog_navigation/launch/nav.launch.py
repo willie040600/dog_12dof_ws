@@ -2,7 +2,7 @@
 
 Start robot_dog_description/isaac/robot_dog_nav_sim.py first, then
     ros2 launch robot_dog_navigation nav.launch.py [slam:=True|False] [map:=<yaml>] [rviz:=true]
-slam:=True builds the map while navigating; slam:=False localizes with AMCL on `map` (default maps/robot_dog_room.yaml).
+slam:=True builds the map while navigating; slam:=False localizes with AMCL on `map` (default maps/apartment.yaml).
 """
 import os
 
@@ -22,7 +22,7 @@ def generate_launch_description():
     params, rviz = LaunchConfiguration('params_file'), LaunchConfiguration('rviz')
     return LaunchDescription([
         DeclareLaunchArgument('slam', default_value='True', description='True: slam_toolbox, False: AMCL on map'),
-        DeclareLaunchArgument('map', default_value=os.path.join(share, 'maps', 'robot_dog_room.yaml')),
+        DeclareLaunchArgument('map', default_value=os.path.join(share, 'maps', 'apartment.yaml')),
         DeclareLaunchArgument('params_file', default_value=os.path.join(share, 'config', 'nav2_params.yaml')),
         DeclareLaunchArgument('rviz', default_value='true'),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(share, 'launch', 'bridge.launch.py'))),
