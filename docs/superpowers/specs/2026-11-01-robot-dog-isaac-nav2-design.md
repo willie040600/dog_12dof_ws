@@ -262,6 +262,8 @@ cd ~/IsaacLab && uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_descrip
 
 ### 5.5 世界（`world.py`）
 
+> 2026-11-03 起由 `2026-11-03-apartment-world-design.md` 取代：場景換成 MUJI 公寓，方塊房間已移除。以下保留原始設計。
+
 - 10 × 10 m 房間，四面外牆高 1.0 m、厚 0.1 m。
 - 兩道內牆把房間分成三個區域，留 1.0 m 寬的通道。
 - 4 個方塊（0.4～0.6 m）、3 個圓柱（直徑 0.3 m），高度都高於 LiDAR 掃描平面（約 0.34 m）。
@@ -302,7 +304,7 @@ robot_dog_navigation/
 
 - `slam:=True`：slam_toolbox（nav2_bringup 的 `slam_launch.py` 啟動 sync 節點），mapping 模式，`base_frame: base_footprint`、`odom_frame: odom`、
   `scan_topic: /scan_filtered`，解析度 0.05 m。
-- `slam:=False`：map_server（`map:=` 參數，預設 `maps/robot_dog_room.yaml`）+ amcl，
+- `slam:=False`：map_server（`map:=` 參數，預設 `maps/apartment.yaml`，計畫 4 前是 `maps/robot_dog_room.yaml`）+ amcl，
   `robot_model_type: nav2_amcl::OmniMotionModel`，初始位置設在原點，`scan_topic: /scan_filtered`。
 - LiDAR 量程 0.15–15 m（Isaac Sim 導航模式覆寫 RTX 設定檔預設的 1.0 m 近距離盲區）；AMCL 與 slam_toolbox 的最大量程都設 15 m。
 
@@ -333,7 +335,7 @@ ros2 launch robot_dog_navigation nav.launch.py slam:=True rviz:=true
 | 參數 | 預設 | 說明 |
 |---|---|---|
 | `slam` | `True` | SLAM 或地圖模式 |
-| `map` | `maps/robot_dog_room.yaml` | 地圖模式用 |
+| `map` | `maps/apartment.yaml` | 地圖模式用 |
 | `params_file` | `config/nav2_params.yaml` | |
 | `rviz` | `true` | |
 
@@ -387,6 +389,9 @@ scan_ground_filter）、`nav2_bringup/bringup_launch.py`（slam_toolbox 或 map_
      （里程計是真值，預設 0.2 太悲觀）。
    - 實作中發現：`TransformListener(spin_thread=True)` 掛在已經被另一個 executor spin 的節點上會讓 `scan_ground_filter`
      segfault（同一節點在兩個 executor）；`scan_ground_filter` 與 `nav_eval` 都改用獨立的 TF 節點。
+4. **計畫 4：場景換成 MUJI 公寓**（spec `2026-11-03-apartment-world-design.md`）。結果（2026-11-03）：方塊房間移除；
+   公寓地圖對齊率 0.998、覆蓋率 0.825；SLAM 5/5、AMCL 5/5（連續兩輪）。另外加了地上薄裝飾不碰撞、原地轉向死區補償、
+   AMCL `alpha` 0.05、膨脹 `cost_scaling_factor` 10。SLAM 模式在主臥門口偶爾卡住（路線先穿過未知區域再翻轉），見該 spec 第 8 節。
 
 ## 8. 測試
 

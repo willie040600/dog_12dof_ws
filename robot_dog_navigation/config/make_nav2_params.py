@@ -41,7 +41,10 @@ def main():
 
     amcl = p['amcl']['ros__parameters']
     amcl.update(robot_model_type='nav2_amcl::OmniMotionModel', scan_topic='scan_filtered', laser_max_range=LASER_MAX,
-                set_initial_pose=True, initial_pose={'x': 0.0, 'y': 0.0, 'z': 0.0, 'yaw': 0.0})
+                set_initial_pose=True, initial_pose={'x': 0.0, 'y': 0.0, 'z': 0.0, 'yaw': 0.0},
+                # /odom comes from the simulator's ground truth: with the default 0.2 the particles spread so much
+                # that AMCL settled 0.32-0.36 m off in the apartment's master bedroom (the map there is within 2 cm)
+                alpha1=0.05, alpha2=0.05, alpha3=0.05, alpha4=0.05, alpha5=0.05)
 
     ctrl = p['controller_server']['ros__parameters']
     ctrl['controller_frequency'] = 20.0

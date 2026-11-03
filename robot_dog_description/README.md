@@ -145,7 +145,7 @@ ROS 2 只收 `/cmd_vel`，所以在 Nav2 看來就是一台「聽 `cmd_vel` 的�
 策略與物理設定都讀 `isaac/policies/<run>/policy.json`；預設用 `policies/` 下名稱排序最後的資料夾。
 
 ```bash
-# 終端 1：Isaac Sim（10 × 10 m 房間、IMU、2D LiDAR、相機）
+# 終端 1：Isaac Sim（MUJI 公寓、IMU、2D LiDAR、相機）
 source /opt/ros/jazzy/setup.bash
 cd ~/IsaacLab && export OMNI_KIT_ACCEPT_EULA=yes
 uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/robot_dog_nav_sim.py
@@ -165,14 +165,29 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard
 | `--policy <資料夾>` | 指定策略（`policy.pt` + `policy.json`） |
 | `--headless` / `--no-camera` | 不開視窗 / 不建相機（筆電省資源） |
 | `--hold` | 指令為 0 且機身靜止 0.3 s 後固定站姿（預設關：剛停下就固定會踉蹌，策略自己站得很穩） |
-| `--world <USD>` | 載入其他場景取代內建房間 |
+| `--world <USD>` | 載入其他 USD 取代公寓（一樣加碰撞與地面摩擦，不平移） |
 | `--max-frames N` | 跑 N 個策略步後結束（smoke test） |
 
 - 發佈 `/clock`、`/joint_states`、`/imu`、`/scan`（10 Hz，量程 0.15–15 m）、`/camera/image_raw`（約 14 Hz）、`/odom_gt`（真值，`odom→base_link`，50 Hz）；
   **不發佈 TF**（由 bridge.launch.py 負責）。
 - `/cmd_vel` 0.5 s 沒更新就視為 0；指令夾在訓練範圍（vx ±0.8、vy ±0.5、wz ±1.0）。
 - 實測（v8）：前進/側移 0.3 m/s 5 秒走 1.44 / 1.47 m，轉 0.8 rad/s 5 秒 3.9 rad，停送指令 1 s 內停穩，零指令 10 s 漂移 0。
-- 即時率（RTX 5070 Ti 筆電，headless，含 bridge）：有相機 0.53、`--no-camera` 0.58（sim 秒 / 牆鐘秒）。所有 ROS 端節點都用 sim time，模擬慢只影響牆鐘時間。
+- 即時率（RTX 5070 Ti 筆電，headless，公寓）：有相機 0.53、`--no-camera` 0.61（sim 秒 / 牆鐘秒）。所有 ROS 端節點都用 sim time，模擬慢只影響牆鐘時間。
+- 原地轉向（vx、vy 都 < 0.05）時，0.03～0.2 rad/s 的 wz 會提高到 0.2：站著時策略不理會 0.15 rad/s 以下的轉向
+  （0.03～0.13 實際只轉 0.01），Nav2 修最後一點朝向時要的正好是約 0.1 rad/s。
+
+### 公寓（`isaac/worlds/MUJI_Apartment_3D.usd`）
+
+- 10 × 6 m，兩間臥室、客餐廚、浴室；貼圖在旁邊的 `textures/`（USD 以相對路徑引用，搬動時要一起搬；少了會在載入時報錯）。
+- 載入時整個平移 −(3.5, 1.8)，讓客廳中央（沙發與電視櫃之間）落在原點；狗在原點、面向 +x 出生。
+- 每個可見的 mesh 都加靜態三角網格碰撞與訓練時的地面摩擦（寫在 stage 上，USD 檔不變）。天花板隱藏且沒有碰撞；
+  貼在地上、頂部 ≤ 2 cm 的薄裝飾（兩塊地毯、立燈底座）也沒有碰撞：地毯 8 mm 的邊緣就是一個策略爬不上去的台階。
+- 常數（出生點、LiDAR 高度 0.31 m、身體高度範圍 0.03～0.35 m）在 `isaac/robot_dog_sim/apartment.py`。
+- 真值平面圖（`map_check` 與目標點淨空用）：公寓檔有改就重跑
+  ```bash
+  cd ~/IsaacLab && uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/tools/make_floorplan.py
+  ```
+  輸出到 `robot_dog_navigation/maps/truth/`（LiDAR 平面一張、身體高度範圍一張，0.05 m）。
 - 一致性：`isaac/policy_parity.py` 和 `isaaclab/scripts/parity_reference.py` 比對同一段 60 s 指令，v8 十段速度差都 < 0.02 m/s。
 
 ## Isaac Sim 6.2（ROS 2 控制）
