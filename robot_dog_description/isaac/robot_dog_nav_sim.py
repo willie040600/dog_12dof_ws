@@ -28,7 +28,7 @@ policies = sorted(glob.glob(os.path.join(HERE, 'policies', '*', 'policy.json')))
 parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
 parser.add_argument('--policy', default=os.path.dirname(policies[-1]) if policies else None,
                     help='folder with policy.pt + policy.json (default: last one under isaac/policies/)')
-parser.add_argument('--world', help='USD to load instead of the generated room (its physics settings are kept)')
+parser.add_argument('--world', help='USD to load instead of the apartment (gets the same collision and friction, not shifted)')
 parser.add_argument('--usd-dir', default=os.path.join(tempfile.gettempdir(), 'robot_dog_isaac_usd'))
 parser.add_argument('--headless', action='store_true')
 parser.add_argument('--no-camera', action='store_true')
@@ -97,11 +97,9 @@ def main():
     meta = load_policy_meta(os.path.join(policy_dir, 'policy.json'))
     log('policy %s (%s)' % (os.path.basename(policy_dir), meta['checkpoint']))
     if args.world:
-        world.apply_physics_settings(stage, meta)
-        stage.DefinePrim('/World/scene', 'Xform').GetReferences().AddReference(os.path.abspath(args.world))
-        world.add_lights(stage)
+        log('world %s: %d collision meshes' % (args.world, world.usd_world(stage, meta, args.world)))
     else:
-        world.room_world(stage, meta)
+        log('apartment: %d collision meshes' % world.apartment_world(stage, meta))
     root = load_robot(stage, simulation_app, convert_urdf(DEFAULT_URDF, args.usd_dir), meta['spawn_height'])
     art_prim, base, joints = robot_parts(root)
     author_policy_physics(root, art_prim, meta)

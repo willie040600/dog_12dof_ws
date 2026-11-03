@@ -1,5 +1,9 @@
 """Stage, physics scene and static geometry. Import only after SimulationApp has started."""
-from pxr import Gf, PhysxSchema, UsdGeom, UsdLux, UsdPhysics, UsdShade
+import os
+
+from pxr import Gf, PhysxSchema, Usd, UsdGeom, UsdLux, UsdPhysics, UsdShade
+
+from . import apartment
 
 
 def setup_stage(stage, physics_hz):
@@ -77,39 +81,44 @@ def flat_world(stage, meta):
     add_lights(stage)
 
 
-# the room's dimensions and obstacles live in room_layout.py (shared with nav_goals and map_check)
-from .room_layout import (BOXES, CYLINDER_HEIGHT, CYLINDER_RADIUS, CYLINDERS, INNER_WALLS,  # noqa: E402
-                          ROOM_HALF, WALL_HEIGHT, WALL_THICKNESS)
+def add_static_collision(stage, root_path, material):
+    """Static triangle-mesh collision and the physics material on every visible mesh under root_path.
+
+    The HIDDEN groups are made invisible first and get no collision. Everything is authored on this stage,
+    so a referenced USD file is not changed. Returns the number of meshes given collision.
+    """
+    root = stage.GetPrimAtPath(root_path)
+    for prim in Usd.PrimRange(root):
+        if prim.GetName() in apartment.HIDDEN:
+            UsdGeom.Imageable(prim).MakeInvisible()
+    count = 0
+    for prim in Usd.PrimRange(root):
+        if prim.GetTypeName() != 'Mesh':
+            continue
+        visible = UsdGeom.Imageable(prim).ComputeVisibility() != UsdGeom.Tokens.invisible
+        if not apartment.wants_collision(prim.GetPath().pathString, visible):
+            continue
+        UsdPhysics.CollisionAPI.Apply(prim)
+        UsdPhysics.MeshCollisionAPI.Apply(prim).CreateApproximationAttr('none')
+        UsdShade.MaterialBindingAPI.Apply(prim).Bind(material, UsdShade.Tokens.weakerThanDescendants, 'physics')
+        count += 1
+    return count
 
 
-def static_cylinder(stage, path, center, radius, height, color, material):
-    cyl = UsdGeom.Cylinder.Define(stage, path)
-    cyl.CreateRadiusAttr(radius)
-    cyl.CreateHeightAttr(height)
-    cyl.CreateAxisAttr('Z')
-    cyl.CreateDisplayColorAttr([Gf.Vec3f(*color)])
-    UsdGeom.Xformable(cyl).AddTranslateOp().Set(Gf.Vec3d(*center))
-    UsdPhysics.CollisionAPI.Apply(cyl.GetPrim())
-    UsdShade.MaterialBindingAPI.Apply(cyl.GetPrim()).Bind(material, UsdShade.Tokens.weakerThanDescendants, 'physics')
-    return cyl.GetPrim()
-
-
-def room_world(stage, meta):
-    """Training physics and ground, plus the 10 x 10 m room with two inner walls, boxes and cylinders."""
+def usd_world(stage, meta, usd_path, offset_xy=(0.0, 0.0)):
+    """Training physics, a USD scene shifted by -offset_xy with static collision on its meshes, and lights."""
     apply_physics_settings(stage, meta)
-    ground = policy_ground(stage, meta)
-    static_box(stage, '/World/ground', (0, 0, -0.05), (40, 40, 0.1), (0.6, 0.6, 0.6), ground)
-    wall, h, t, r = (0.75, 0.72, 0.68), WALL_HEIGHT, WALL_THICKNESS, ROOM_HALF
-    for i, (center, size) in enumerate((((0, r, h / 2), (2 * r + t, t, h)), ((0, -r, h / 2), (2 * r + t, t, h)),
-                                        ((r, 0, h / 2), (t, 2 * r, h)), ((-r, 0, h / 2), (t, 2 * r, h)))):
-        static_box(stage, '/World/room/outer_%d' % i, center, size, wall, ground)
-    for i, (x, (g0, g1)) in enumerate(INNER_WALLS):
-        for j, (y0, y1) in enumerate(((-r, g0), (g1, r))):
-            static_box(stage, '/World/room/inner_%d_%d' % (i, j), (x, (y0 + y1) / 2, h / 2), (t, y1 - y0, h), wall,
-                       ground)
-    for i, ((x, y), s) in enumerate(BOXES):
-        static_box(stage, '/World/room/box_%d' % i, (x, y, s / 2), (s, s, s), (0.8, 0.3, 0.2), ground)
-    for i, (x, y) in enumerate(CYLINDERS):
-        static_cylinder(stage, '/World/room/cylinder_%d' % i, (x, y, CYLINDER_HEIGHT / 2), CYLINDER_RADIUS,
-                        CYLINDER_HEIGHT, (0.2, 0.4, 0.8), ground)
+    scene = stage.DefinePrim('/World/scene', 'Xform')
+    scene.GetReferences().AddReference(os.path.abspath(usd_path))
+    UsdGeom.Xformable(scene).AddTranslateOp().Set(Gf.Vec3d(-offset_xy[0], -offset_xy[1], 0.0))
+    count = add_static_collision(stage, '/World/scene', policy_ground(stage, meta))
     add_lights(stage)
+    return count
+
+
+def apartment_world(stage, meta):
+    """The MUJI apartment, shifted so its spawn point is the world origin (spec 2026-11-03)."""
+    missing = apartment.missing_textures(apartment.USD)
+    if missing:
+        raise RuntimeError('%s: %d textures missing next to it, e.g. %s' % (apartment.USD, len(missing), missing[0]))
+    return usd_world(stage, meta, apartment.USD, apartment.SPAWN_XY)
