@@ -10,7 +10,9 @@ USD = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 SPAWN_XY = (3.5, 1.8)        # living room, between the sofa and the TV stand (0.70 m clear)
 LIDAR_HEIGHT = 0.31          # standing base height 0.226 m + laser_joint 0.085 m
 BODY_BAND = (0.03, 0.35)     # heights that block the dog's body
-HIDDEN = ('Ceiling_Group',)  # not shown and not collided with (lets the sun in, top view in the GUI)
+# not shown and not collided with: the ceiling (lets the sun in, top view in the GUI) and the four door leaves and
+# handles (they stood open into the rooms and hid walls from the LiDAR; the frames stay)
+HIDDEN = ('Ceiling_Group',) + tuple('%s_Door_0%d' % (part, i) for part in ('Leaf', 'Handle') for i in range(1, 5))
 FLAT_TOP = 0.02              # flat decor lying on the floor (the 8 mm rug) is walked over, not collided with:
                              # its edge is a step the policy, trained on flat ground, cannot climb
 

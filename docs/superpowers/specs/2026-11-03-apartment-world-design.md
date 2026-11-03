@@ -66,7 +66,7 @@ robot_dog_description/isaac/worlds/
 | `SPAWN_XY` | `(3.5, 1.8)` | 公寓座標中的出生點（客廳中央、沙發與電視櫃之間）；載入時整個公寓平移 `−SPAWN_XY` |
 | `LIDAR_HEIGHT` | 0.31 m | 站姿機身高 0.226 m + `laser_joint` 0.085 m |
 | `BODY_BAND` | 0.03～0.35 m | 會擋到狗身體的高度範圍 |
-| `HIDDEN` | `('Ceiling_Group',)` | 載入時隱藏 |
+| `HIDDEN` | `('Ceiling_Group',)` + 四扇門的 `Leaf_Door_0N`、`Handle_Door_0N` | 載入時隱藏、不加碰撞（門板 2026-11-03 結案後依使用者要求移除：開著的門板擋住牆，掃圖不完整；門框保留） |
 
 ### 3.3 `world.apartment_world(stage, meta)`
 
