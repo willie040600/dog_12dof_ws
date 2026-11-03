@@ -64,3 +64,17 @@ def test_non_finite_command_components_become_zero():
     b = CommandBuffer(RANGES)
     b.update((float('nan'), 0.2, float('inf')), 0.0)
     assert b.get(0.1) == (0.0, 0.2, 0.0)
+
+
+def test_small_turn_in_place_is_raised_to_what_the_policy_follows():
+    # standing, the policy ignores |wz| below ~0.15 rad/s (median 0.01 for 0.03-0.13 in the apartment runs)
+    buf = CommandBuffer(RANGES)
+    for wz, expected in ((0.1, 0.2), (-0.05, -0.2), (0.25, 0.25), (0.02, 0.02), (0.0, 0.0)):
+        buf.update((0.0, 0.0, wz), 0.0)
+        assert buf.get(0.0) == (0.0, 0.0, expected), wz
+
+
+def test_small_turn_while_walking_is_kept():
+    buf = CommandBuffer(RANGES)
+    buf.update((0.3, 0.0, 0.1), 0.0)
+    assert buf.get(0.0) == (0.3, 0.0, 0.1)

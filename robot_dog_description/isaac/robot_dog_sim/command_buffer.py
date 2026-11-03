@@ -5,18 +5,26 @@ AXES = ('lin_vel_x', 'lin_vel_y', 'ang_vel_z')
 
 
 class CommandBuffer:
-    """Latest (vx, vy, wz), clipped to the training ranges; zero once it is older than timeout."""
+    """Latest (vx, vy, wz), clipped to the training ranges; zero once it is older than timeout.
 
-    def __init__(self, ranges, timeout=0.5):
+    Turning in place (|vx|, |vy| < still), a yaw rate between turn_eps and min_turn is raised to min_turn: standing,
+    the policy does not follow |wz| below ~0.15 rad/s, and Nav2 asks for ~0.1 rad/s for the last bit of goal heading.
+    """
+
+    def __init__(self, ranges, timeout=0.5, min_turn=0.2, turn_eps=0.03, still=0.05):
         self._ranges = [ranges[a] for a in AXES]
         self._timeout = timeout
+        self._min_turn, self._turn_eps, self._still = min_turn, turn_eps, still
         self._cmd = (0.0, 0.0, 0.0)
         self._stamp = None
 
     def update(self, cmd, t):
         # non-finite components (a malformed Twist) become 0 instead of reaching the policy
-        self._cmd = tuple(min(max(float(c), lo), hi) if math.isfinite(c) else 0.0
-                          for c, (lo, hi) in zip(cmd, self._ranges))
+        vx, vy, wz = (min(max(float(c), lo), hi) if math.isfinite(c) else 0.0
+                      for c, (lo, hi) in zip(cmd, self._ranges))
+        if abs(vx) < self._still and abs(vy) < self._still and self._turn_eps <= abs(wz) < self._min_turn:
+            wz = math.copysign(self._min_turn, wz)
+        self._cmd = (vx, vy, wz)
         self._stamp = t
 
     def get(self, t):
