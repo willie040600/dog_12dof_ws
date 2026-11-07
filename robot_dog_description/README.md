@@ -91,6 +91,8 @@ robot_dog_description/
 
 ## ROS 2 Jazzy（在另一台 Ubuntu 24.04 上執行）
 
+從 GitHub clone 整個 repo 的話，照[根目錄 README](../README.md)安裝。下面是只把這個套件複製過去的做法。
+
 Windows 只用來跑 Fusion；整個 `robot_dog_description` 資料夾（或 `robot_dog_description.zip`）
 複製到 Ubuntu 就能用，URDF、網格都已經在裡面，不需要 Fusion。
 

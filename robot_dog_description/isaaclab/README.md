@@ -19,7 +19,7 @@ isaaclab/
 
 ## 前提
 
-Isaac Lab 3.0 原始碼在 `~/IsaacLab`，已用 `uv` 建好環境（內含 Isaac Sim 6.2 pip 版），RTX 顯卡驅動。
+Isaac Lab 3.0 原始碼在 `~/IsaacLab`，已用 `uv` 建好環境（內含 Isaac Sim 6.2 pip 版），RTX 顯卡驅動。還沒裝的話見[根目錄 README](../../README.md)，裡面有指定的 commit。
 所有指令都在 `~/IsaacLab` 底下、用它的 uv 環境執行，**不需要**另外建立 Isaac Lab 外部專案。
 
 ```bash
