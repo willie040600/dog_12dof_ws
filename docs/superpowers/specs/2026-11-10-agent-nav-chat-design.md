@@ -64,14 +64,16 @@ robot_dog_agent/
 │   ├── tools.py      給 Gemini 的工具宣告，以及執行工具的 Toolbox（純 Python）
 │   ├── gemini.py     Interactions API 客戶端（requests）
 │   ├── agent.py      對話迴圈：送出、執行工具呼叫、回傳結果，直到拿到文字回覆（純 Python）
-│   ├── robot.py      Robot：Nav2 目標、目前位置、取消（rclpy）；FakeRobot：不需要 ROS 的替身
+│   ├── robot.py      機器人介面（pose、go_to）和 FakeRobot：不需要 ROS 的替身（純 Python）
+│   ├── nav2_robot.py Nav2Robot：Nav2 目標、目前位置、取消（rclpy）
 │   ├── chat.py       終端機對話的入口
+│   ├── eval_cases.py 第 7 節六句話的判定（純 Python）
 │   └── agent_eval.py 第 7 節的實機檢查
 └── test/
 ```
 
-依賴方向：`chat` → `agent` → `gemini`、`tools` → `places`、`robot`。`agent`、`tools`、`places` 不匯入 rclpy
-和 requests，測試時換成假的 LLM 和 `FakeRobot`。
+依賴方向：`chat` → `agent`、`gemini`、`tools` → `places`、`robot`。`agent`、`tools`、`places`、`robot`、
+`eval_cases` 不匯入 rclpy 和 requests，測試時換成假的 LLM 和 `FakeRobot`。
 
 資料流程：
 
@@ -153,6 +155,9 @@ robot_dog_agent/
    其中一個的結果不是 `ok` 或 `reached` 時，後面的不執行，結果填 `skipped`。
 4. 把全部結果送回 Gemini，回到第 2 步。
 5. 一個指令最多 8 輪；超過就停下來，告訴使用者這個指令用了太多步驟。
+6. 回應既沒有文字也沒有工具呼叫時，回一句固定的訊息請使用者再說一次。
+7. 中途丟出任何例外（重試用完、等 Gemini 時按 Ctrl+C），或超過 8 輪，都**重新開始對話**（不再帶
+   `previous_interaction_id`）：伺服器上的對話停在沒有結果的工具呼叫，接不下去。代價是忘掉之前的對話。
 
 system instruction 的內容：
 - 角色：你透過工具控制模擬公寓裡的一隻四足機器狗。
