@@ -78,3 +78,46 @@ CASES = tuple((sentence, unless_fallen(judge)) for sentence, judge in (
     ('去座標 (0.4, 2.7)', judge_stays_put),          # the middle of the bed: must be refused
     ('你現在在哪裡', judge_answers_without_moving),
 ))
+
+
+class WatchedRobot:
+    """A robot (robot.py) that counts the goals it is sent and records the true pose each navigation ended at."""
+
+    def __init__(self, robot, truth_pose):
+        self.robot, self.truth_pose = robot, truth_pose
+        self.reset()
+
+    def reset(self):
+        self.goals_sent, self.nav_ends = 0, []
+
+    def pose(self):
+        return self.robot.pose()
+
+    def go_to(self, x, y, yaw, on_progress=None):
+        self.goals_sent += 1
+        result = self.robot.go_to(x, y, yaw, on_progress=on_progress)
+        self.nav_ends.append(self.truth_pose())
+        return result
+
+
+def run_cases(ask, watched, truth_pose, fell, say=print, cases=CASES):
+    """Put every sentence to ask(sentence) -> reply and judge what happened; returns how many passed.
+
+    truth_pose() -> ground-truth (x, y, yaw) now; fell() -> True when the dog fell since the last call.
+    A sentence that raises is a failure, and the next one still runs.
+    """
+    passed = 0
+    for sentence, judge in cases:
+        watched.reset()
+        fell()
+        before, reply = truth_pose(), ''
+        try:
+            reply = ask(sentence)
+            ok, why = judge(Observation(before, truth_pose(), list(watched.nav_ends), watched.goals_sent, reply,
+                                        fell()))
+        except Exception as e:
+            ok, why = False, 'error: %s' % e
+        passed += ok
+        say('[AGENT] %s  %s  %s | 回覆：%s' % (sentence, 'PASS' if ok else 'FAIL', why, reply.replace('\n', ' ')))
+    say('[AGENT] PASS %d/%d' % (passed, len(cases)))
+    return passed
