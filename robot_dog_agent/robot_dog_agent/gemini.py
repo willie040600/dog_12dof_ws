@@ -88,7 +88,10 @@ class GeminiClient:
             message = error_message(response)
             hint = 'API key 無效，請檢查 GEMINI_API_KEY。' if 'API key' in message else ''
             raise GeminiError('%sGemini 拒絕了請求（HTTP %d）：%s' % (hint, response.status_code, message))
-        self.previous_id, reply = parse_reply(response.json())
+        try:
+            self.previous_id, reply = parse_reply(response.json())
+        except (ValueError, AttributeError, TypeError):
+            raise GeminiError('看不懂 Gemini 的回應（HTTP 200，但不是預期的格式）') from None
         return reply
 
     def _post(self, text, results, previous_id):
@@ -98,8 +101,11 @@ class GeminiClient:
         for wait in self.RETRY_WAITS + (None,):
             try:
                 response = self.post(self.URL, headers=headers, json=request, timeout=self.TIMEOUT)
-            except (requests.ConnectionError, requests.Timeout) as e:
+            except (requests.ConnectionError, requests.Timeout, requests.exceptions.ChunkedEncodingError) as e:
                 problem, limited = '連不上 Gemini（%s）' % type(e).__name__, False
+            except requests.RequestException as e:
+                # only the class name: the message of e.g. InvalidHeader quotes the header value, which is the key
+                raise GeminiError('送不出請求（%s），請檢查 GEMINI_API_KEY 的格式' % type(e).__name__) from None
             else:
                 if response.status_code != 429 and response.status_code < 500:
                     return response

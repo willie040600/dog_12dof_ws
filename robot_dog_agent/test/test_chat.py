@@ -85,3 +85,26 @@ def test_tool_calls_are_shown():
     agent = chat.build_agent(FakeRobot(), 'k', 'm', say=said.append)
     agent.on_call(Call('c1', 'go_to_place', {'place': 'kitchen'}), {'status': 'blocked', 'reason': 'on an obstacle'})
     assert said == ['  [工具] go_to_place {"place": "kitchen"} → blocked（on an obstacle）']
+
+
+# --- final review ---
+
+def test_unexpected_errors_do_not_end_the_chat():
+    agent, said = run(['一', '二', 'exit'], [ValueError('some detail'), '好'])
+    assert agent.asked == ['一', '二']
+    assert said == ['[錯誤] 程式內部錯誤（ValueError），這一句沒有完成。', '狗> 好']
+
+
+def test_usable_key():
+    assert chat.usable_key('  abc-123_x\r\n') == 'abc-123_x'
+    assert chat.usable_key('AQ.Ab8-x_y') == 'AQ.Ab8-x_y'     # real keys contain dots
+    for bad in (None, '', '   ', 'ab c', 'ab\tc', 'abc\x00', 'ab鑰c', '"abc"'):
+        assert chat.usable_key(bad) is None, bad
+
+
+def test_main_with_a_malformed_key_does_not_show_it(monkeypatch, capsys):
+    monkeypatch.setenv('GEMINI_API_KEY', 'my secret key')
+    assert chat.main(['--no-robot']) == 2
+    out = capsys.readouterr().out
+    assert 'secret' not in out and 'GEMINI_API_KEY' in out
+

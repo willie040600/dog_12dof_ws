@@ -9,7 +9,10 @@ JUDGE = [judge for _, judge in CASES]
 
 def obs(**kw):
     return Observation(**{**dict(before=(0.0, 0.0, 0.0), after=(0.0, 0.0, 0.0), nav_ends=[], goals_sent=0, reply='好',
-                                 fell=False), **kw})
+                                 fell=False, tool_calls=[]), **kw})
+
+
+BLOCKED, WHERE = [('go_to_pose', 'blocked')], [('get_pose', 'ok')]
 
 
 def ok(n, **kw):
@@ -56,23 +59,40 @@ def test_case_4_turn_left():
 
 
 def test_case_5_blocked_coordinates():
-    assert ok(5, before=(1.0, 0.0, 1.5), after=(1.05, 0.0, 1.5))
-    assert not ok(5, goals_sent=1)
-    assert not ok(5, after=(0.2, 0.0, 0.0))
+    assert ok(5, before=(1.0, 0.0, 1.5), after=(1.05, 0.0, 1.5), tool_calls=BLOCKED)
+    assert ok(5, tool_calls=WHERE + BLOCKED)                    # looking first is fine
+    assert not ok(5, goals_sent=1, tool_calls=BLOCKED)
+    assert not ok(5, after=(0.2, 0.0, 0.0), tool_calls=BLOCKED)
+    assert not ok(5)                                            # the model never tried: nothing was refused
+    assert not ok(5, tool_calls=[('go_to_pose', 'error')])
 
 
 def test_case_6_where_am_i():
-    assert ok(6, reply='我在起點附近')
-    assert not ok(6, reply='  ')
-    assert not ok(6, goals_sent=1)
-    assert not ok(6, after=(0.2, 0.0, 0.0))
+    assert ok(6, reply='我在起點附近', tool_calls=WHERE)
+    assert not ok(6, reply='  ', tool_calls=WHERE)
+    assert not ok(6, goals_sent=1, tool_calls=WHERE)
+    assert not ok(6, after=(0.2, 0.0, 0.0), tool_calls=WHERE)
+    assert not ok(6, reply='我在客廳')                          # answered without looking
+    assert not ok(6, tool_calls=[('get_pose', 'error')])
+
+
+def test_the_agents_stand_in_replies_fail_every_case():
+    from robot_dog_agent.agent import EMPTY_REPLY, TOO_MANY_ROUNDS
+    for n, kw in enumerate(GOOD, 1):
+        assert ok(n, **kw), n
+        for reply in (EMPTY_REPLY, TOO_MANY_ROUNDS):
+            passed, why = JUDGE[n - 1](obs(reply=reply, **kw))
+            assert not passed and 'no answer' in why, (n, reply)
+
+
+GOOD = [dict(after=(MB.x, MB.y, MB.yaw), goals_sent=1),
+        dict(nav_ends=[(K.x, K.y, K.yaw), (0.0, 0.0, 0.0)], goals_sent=2),
+        dict(after=(0.5, 0.0, 0.0), goals_sent=1), dict(after=(0.0, 0.0, math.pi / 2), goals_sent=1),
+        dict(tool_calls=BLOCKED), dict(tool_calls=WHERE)]
 
 
 def test_a_fall_fails_every_case():
-    good = [dict(after=(MB.x, MB.y, MB.yaw), goals_sent=1),
-            dict(nav_ends=[(K.x, K.y, K.yaw), (0.0, 0.0, 0.0)], goals_sent=2),
-            dict(after=(0.5, 0.0, 0.0), goals_sent=1), dict(after=(0.0, 0.0, math.pi / 2), goals_sent=1), {}, {}]
-    for n, kw in enumerate(good, 1):
+    for n, kw in enumerate(GOOD, 1):
         assert ok(n, **kw), n
         passed, why = JUDGE[n - 1](obs(fell=True, **kw))
         assert not passed and 'fell' in why, n
@@ -81,6 +101,7 @@ def test_a_fall_fails_every_case():
 # --- the runner ---
 
 from robot_dog_agent.eval_cases import WatchedRobot, run_cases  # noqa: E402
+from robot_dog_agent.agent import Call  # noqa: E402
 from robot_dog_agent.robot import FakeRobot  # noqa: E402
 
 
@@ -93,8 +114,10 @@ def test_watched_robot_counts_goals_and_records_where_they_ended():
     watched.go_to(1.0, 1.0, 0.5)
     assert watched.goals_sent == 2 and watched.nav_ends == [(1.01, 0.01, 0.01), (1.01, 1.01, 0.51)]
     assert robot.progress_callbacks[0] == seen.append
+    watched.on_call(Call('c1', 'go_to_pose', {'x': 1.0, 'y': 0.0}), {'status': 'reached'})
+    assert watched.tool_calls == [('go_to_pose', 'reached')]
     watched.reset()
-    assert watched.goals_sent == 0 and watched.nav_ends == []
+    assert watched.goals_sent == 0 and watched.nav_ends == [] and watched.tool_calls == []
 
 
 def test_run_cases_judges_each_sentence_and_carries_on_after_an_error():
@@ -110,6 +133,7 @@ def test_run_cases_judges_each_sentence_and_carries_on_after_an_error():
             raise RuntimeError('rate limited')
         if sentence == '走':
             watched.go_to(1.0, 0.0, 0.0)
+            watched.on_call(Call('c', 'go_to_pose', {}), {'status': 'reached'})
         if len(asked) == 2:
             fallen.append(True)             # the dog falls during the second sentence
         return '好'
@@ -126,11 +150,12 @@ def test_run_cases_judges_each_sentence_and_carries_on_after_an_error():
                        cases=(('走', judge), ('走', judge), ('壞掉', judge), ('站著', judge)))
     assert passed == 2
     assert seen == [Observation(before=(0.0, 0.0, 0.0), after=(1.0, 0.0, 0.0), nav_ends=[(1.0, 0.0, 0.0)],
-                                goals_sent=1, reply='好', fell=False),
+                                goals_sent=1, reply='好', fell=False, tool_calls=[('go_to_pose', 'reached')]),
                     Observation(before=(1.0, 0.0, 0.0), after=(1.0, 0.0, 0.0), nav_ends=[(1.0, 0.0, 0.0)],
-                                goals_sent=1, reply='好', fell=True),      # counters start over for every case
+                                goals_sent=1, reply='好', fell=True,       # counters start over for every case
+                                tool_calls=[('go_to_pose', 'reached')]),
                     Observation(before=(1.0, 0.0, 0.0), after=(1.0, 0.0, 0.0), nav_ends=[], goals_sent=0, reply='好',
-                                fell=False)]                                # the failed sentence is not judged
+                                fell=False, tool_calls=[])]                                # the failed sentence is not judged
     assert said == ['[AGENT] 走  PASS  1 goals | 回覆：好', '[AGENT] 走  PASS  1 goals | 回覆：好',
                     '[AGENT] 壞掉  FAIL  error: rate limited | 回覆：', '[AGENT] 站著  FAIL  0 goals | 回覆：好',
                     '[AGENT] PASS 2/4']

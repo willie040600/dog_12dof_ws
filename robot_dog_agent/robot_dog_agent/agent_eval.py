@@ -50,12 +50,18 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--model', default=chat.DEFAULT_MODEL, help='Gemini model id')
     args, _ = parser.parse_known_args(argv)
-    api_key = os.environ.get('GEMINI_API_KEY')
+    api_key = chat.usable_key(os.environ.get('GEMINI_API_KEY'))
     if not api_key:
-        print(chat.NO_KEY)
+        print(chat.BAD_KEY if os.environ.get('GEMINI_API_KEY', '').strip() else chat.NO_KEY)
         return 2
     say = functools.partial(print, flush=True)
-    robot = Nav2Robot()
+    try:
+        robot = Nav2Robot()
+    except RuntimeError as e:
+        say('[AGENT] FAIL: the robot is not localized (%s)' % e)
+        return 1
+    except KeyboardInterrupt:
+        return 130
     try:
         truth = GroundTruth(robot.node)
         truth.xy_yaw()
@@ -63,7 +69,7 @@ def main(argv=None):
             say('[AGENT] FAIL: AMCL is not localized at the start')
             return 1
         watched = WatchedRobot(robot, truth.xy_yaw)
-        agent = chat.build_agent(watched, api_key, args.model, say=say)
+        agent = chat.build_agent(watched, api_key, args.model, say=say, on_call=watched.on_call)
         passed = run_cases(agent.ask, watched, truth.xy_yaw, truth.fell, say=say)
         return 0 if passed == len(CASES) else 1
     finally:

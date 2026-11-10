@@ -3,10 +3,12 @@ import math
 from collections import namedtuple
 
 from robot_dog_agent import places
+from robot_dog_agent.agent import EMPTY_REPLY, TOO_MANY_ROUNDS
 
 # before / after and the entries of nav_ends are ground-truth (x, y, yaw); nav_ends holds the pose at the end of
-# every navigation the robot was sent on, goals_sent how many there were
-Observation = namedtuple('Observation', 'before after nav_ends goals_sent reply fell')
+# every navigation the robot was sent on, goals_sent how many there were, tool_calls the (tool name, result
+# status) of every tool call the model made
+Observation = namedtuple('Observation', 'before after nav_ends goals_sent reply fell tool_calls')
 
 XY_TOLERANCE, YAW_TOLERANCE = 0.25, 0.3  # m, rad (the same as nav_eval)
 STILL = 0.1                              # m; moved less than this = did not move
@@ -54,42 +56,59 @@ def judge_turn_left(obs):
             'turned %.0f deg and moved %.2f m' % (math.degrees(turned), moved))
 
 
-def judge_stays_put(obs):
-    moved = distance(obs.before, obs.after)
-    return obs.goals_sent == 0 and moved <= STILL, '%d goals sent, moved %.2f m' % (obs.goals_sent, moved)
+def stays_put_after(obs, tool, status):
+    """(ok, why): the model called `tool` and got `status`, no goal went out and the dog did not move."""
+    moved, called = distance(obs.before, obs.after), any(c == (tool, status) for c in obs.tool_calls)
+    return (called and obs.goals_sent == 0 and moved <= STILL,
+            '%s -> %s %s, %d goals sent, moved %.2f m' % (tool, status, 'seen' if called else 'NOT seen',
+                                                          obs.goals_sent, moved))
+
+
+def judge_refuses_the_bed(obs):
+    return stays_put_after(obs, 'go_to_pose', 'blocked')
 
 
 def judge_answers_without_moving(obs):
-    ok, why = judge_stays_put(obs)
+    ok, why = stays_put_after(obs, 'get_pose', 'ok')
     return ok and bool(obs.reply.strip()), why + (', empty reply' if not obs.reply.strip() else '')
 
 
-def unless_fallen(judge):
+def checked(judge):
+    """judge, after the two things that fail any sentence: a fall, and the Agent's stand-ins for an answer."""
     def judged(obs):
-        return (False, 'the dog fell') if obs.fell else judge(obs)
+        if obs.fell:
+            return False, 'the dog fell'
+        if obs.reply in (EMPTY_REPLY, TOO_MANY_ROUNDS):
+            return False, 'no answer from the model'
+        return judge(obs)
     return judged
 
 
-CASES = tuple((sentence, unless_fallen(judge)) for sentence, judge in (
+CASES = tuple((sentence, checked(judge)) for sentence, judge in (
     ('去主臥室', judge_master_bedroom),
     ('先去廚房，再回起點', judge_kitchen_then_start),
     # half a metre: a whole one from the start, 0.3 rad off its heading, ends too close to the side chair
     ('往前走半公尺', judge_half_a_metre_forward),
     ('向左轉 90 度', judge_turn_left),
-    ('去座標 (0.4, 2.7)', judge_stays_put),          # the middle of the bed: must be refused
+    ('去座標 (0.4, 2.7)', judge_refuses_the_bed),    # the middle of the bed: the tool must refuse it
     ('你現在在哪裡', judge_answers_without_moving),
 ))
 
 
 class WatchedRobot:
-    """A robot (robot.py) that counts the goals it is sent and records the true pose each navigation ended at."""
+    """A robot (robot.py) that counts the goals it is sent, records the true pose each navigation ended at and,
+    through on_call, the tool calls behind them."""
 
     def __init__(self, robot, truth_pose):
         self.robot, self.truth_pose = robot, truth_pose
         self.reset()
 
     def reset(self):
-        self.goals_sent, self.nav_ends = 0, []
+        self.goals_sent, self.nav_ends, self.tool_calls = 0, [], []
+
+    def on_call(self, call, result):
+        """For Agent's on_call: remember which tool was called and how it ended."""
+        self.tool_calls.append((call.name, result.get('status')))
 
     def pose(self):
         return self.robot.pose()
@@ -115,7 +134,7 @@ def run_cases(ask, watched, truth_pose, fell, say=print, cases=CASES):
         try:
             reply = ask(sentence)
             ok, why = judge(Observation(before, truth_pose(), list(watched.nav_ends), watched.goals_sent, reply,
-                                        fell()))
+                                        fell(), list(watched.tool_calls)))
         except Exception as e:
             ok, why = False, 'error: %s' % e
         passed += ok

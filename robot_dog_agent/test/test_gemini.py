@@ -168,3 +168,26 @@ def test_tool_results_are_not_resent_into_a_new_conversation():
 def test_non_json_error_body():
     c, _, sleeps, _ = client([Response(502, text='<html>Bad Gateway</html>')] * 3 + [recorded('text')])
     assert c.send(text='哈囉').text.strip() and sleeps == [10, 20, 40]
+
+
+# --- final review ---
+
+def test_a_reply_cut_off_half_way_is_retried():
+    c, _, sleeps, _ = client([requests.exceptions.ChunkedEncodingError('cut'), recorded('text')])
+    assert c.send(text='哈囉').text.strip() and sleeps == [10]
+
+
+def test_other_request_errors_do_not_leak_the_key():
+    # requests refuses a header value with leading whitespace and quotes the whole value in its message
+    error = requests.exceptions.InvalidHeader("Invalid leading whitespace in header value: ' secret-key'")
+    c, post, sleeps, _ = client([error], key=' secret-key')
+    with pytest.raises(GeminiError) as e:
+        c.send(text='哈囉')
+    assert 'secret-key' not in str(e.value) and 'InvalidHeader' in str(e.value)
+    assert sleeps == [] and len(post.calls) == 1
+
+
+def test_a_200_that_is_not_json_is_an_error():
+    c, _, _, _ = client([Response(200, text='<html>proxy login</html>')])
+    with pytest.raises(GeminiError, match='看不懂'):
+        c.send(text='哈囉')
