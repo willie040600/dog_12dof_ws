@@ -1,8 +1,9 @@
-"""robot_dog navigation (ROS side): bridge (TF, scan filter) + Nav2 with slam_toolbox or AMCL + RViz.
+"""robot_dog navigation (ROS side): bridge (TF, scan filter) + Nav2 with slam_toolbox or AMCL, and RViz on request.
 
 Start robot_dog_description/isaac/robot_dog_nav_sim.py first, then
-    ros2 launch robot_dog_navigation nav.launch.py [slam:=True|False] [map:=<yaml>] [rviz:=true]
+    ros2 launch robot_dog_navigation nav.launch.py [slam:=True|False] [map:=<yaml>] [rviz:=true|false]
 slam:=True builds the map while navigating; slam:=False localizes with AMCL on `map` (default maps/apartment.yaml).
+rviz:=true also opens RViz (off by default, to save resources).
 """
 import os
 
@@ -24,7 +25,7 @@ def generate_launch_description():
         DeclareLaunchArgument('slam', default_value='True', description='True: slam_toolbox, False: AMCL on map'),
         DeclareLaunchArgument('map', default_value=os.path.join(share, 'maps', 'apartment.yaml')),
         DeclareLaunchArgument('params_file', default_value=os.path.join(share, 'config', 'nav2_params.yaml')),
-        DeclareLaunchArgument('rviz', default_value='true'),
+        DeclareLaunchArgument('rviz', default_value='false'),
         IncludeLaunchDescription(PythonLaunchDescriptionSource(os.path.join(share, 'launch', 'bridge.launch.py'))),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(nav2, 'launch', 'bringup_launch.py')),

@@ -14,7 +14,7 @@ source install/setup.bash
 # 終端 1：Isaac Sim（MUJI 公寓；見 robot_dog_description/README.md「Isaac Sim 6.2 導航模式」；狗在客廳中央的原點、面向 +x 出發）
 cd ~/IsaacLab && export OMNI_KIT_ACCEPT_EULA=yes
 uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/robot_dog_nav_sim.py
-# 終端 2：bridge + Nav2 + RViz（一條指令）
+# 終端 2：bridge + Nav2（一條指令；加 rviz:=true 會一起開 RViz）
 ros2 launch robot_dog_navigation nav.launch.py                 # SLAM：邊建圖邊導航
 ros2 launch robot_dog_navigation nav.launch.py slam:=False     # AMCL：用 maps/apartment.yaml 定位
 ```
@@ -24,9 +24,9 @@ ros2 launch robot_dog_navigation nav.launch.py slam:=False     # AMCL：用 maps
 | `slam` | `True` | `True`：slam_toolbox；`False`：map_server + AMCL |
 | `map` | `maps/apartment.yaml` | AMCL 模式的地圖 |
 | `params_file` | `config/nav2_params.yaml` | |
-| `rviz` | `true` | |
+| `rviz` | `false` | `true`：一起開 RViz |
 
-在 RViz 按工具列的 **Nav2 Goal**，在地圖上點一下並拖出方向，狗就會走過去。
+用 `rviz:=true` 開 RViz 後，按工具列的 **Nav2 Goal**，在地圖上點一下並拖出方向，狗就會走過去。
 AMCL 的初始位置設在原點；若 Isaac Sim 不是剛啟動（狗不在原點），先用 **2D Pose Estimate** 指定位置。
 浴室（東南角）門口只有 0.8 m、裡面最寬 0.40 m，和膨脹半徑差不多，Nav2 多半規劃不進去；淋浴盤（5 cm）比 LiDAR 平面低，
 地圖上沒有，硬送進去可能被絆到。

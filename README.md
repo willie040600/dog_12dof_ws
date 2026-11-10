@@ -75,14 +75,16 @@ cd ~/IsaacLab && export OMNI_KIT_ACCEPT_EULA=yes
 uv run --extra isaacsim python ~/dog_12dof_ws/robot_dog_description/isaac/robot_dog_nav_sim.py
 ```
 
-等機器狗出現後，在終端 2 啟動 Nav2 和 RViz：
+等機器狗出現後，在終端 2 啟動 Nav2：
 
 ```bash
 cd ~/dog_12dof_ws && source install/setup.bash
 ros2 launch robot_dog_navigation nav.launch.py slam:=False
 ```
 
-`slam:=False` 用 repo 裡的地圖定位；不加就是邊走邊建圖。在 RViz 按 **Nav2 Goal**，再點地圖上的目標。
+`slam:=False` 用 repo 裡的地圖定位；不加就是邊走邊建圖。
+
+預設不開 RViz，比較省資源。想在地圖上點目標時，指令後面加 `rviz:=true`，再在 RViz 按 **Nav2 Goal**，點地圖上的目標。
 
 ## 用中文指揮機器狗
 
@@ -108,7 +110,7 @@ cd ~/dog_12dof_ws && source install/setup.bash
 ros2 run robot_dog_navigation nav_eval
 ```
 
-最後應該看到 `[NAV] PASS 5/5`。2026-11-07 從全新 clone 以 `--headless --no-camera`、`rviz:=false` 跑過，結果是 5/5。
+最後應該看到 `[NAV] PASS 5/5`。2026-11-07 從全新 clone 以 `--headless --no-camera`、不開 RViz 跑過，結果是 5/5。
 
 不需要模擬器的快速測試：
 
@@ -130,7 +132,7 @@ cd ~/dog_12dof_ws/robot_dog_agent && python3 -m pytest test -q
 |---|---|
 | Isaac Sim 一啟動就結束 | 終端 1 要先 `source /opt/ros/jazzy/setup.bash` |
 | 跑得比真實時間慢 | 正常，ROS 端都用模擬時間。可以加 `--headless --no-camera` 省資源，驗證環境的即時率約 0.61 |
-| 沒有畫面的機器 | 模擬加 `--headless --no-camera`，Nav2 加 `rviz:=false` |
+| 沒有畫面的機器 | 模擬加 `--headless --no-camera`；Nav2 預設就不開 RViz |
 | 想用鍵盤遙控 | 另外裝 `ros-jazzy-teleop-twist-keyboard`，步驟見 [robot_dog_description/README.md](robot_dog_description/README.md) |
 
 ## 資料夾
