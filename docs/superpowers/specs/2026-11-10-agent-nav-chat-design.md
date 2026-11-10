@@ -49,8 +49,15 @@
 - **預設模型**：`gemini-3.6-flash`（文件標為 Stable）。用 `--model` 可以換。
 - **不裝 SDK，直接用 `requests` 呼叫 REST**。Ubuntu 24.04 的系統 Python 擋 `pip install`，ROS 節點又只能用
   系統 Python；`python3-requests` 已經裝好，而且只有一個端點。
-- 文件沒有列出回應 JSON 的完整欄位（例如文字回覆在 step 裡的確切位置）。實作的第一步是用真的 key 打一次
-  API，把回應存成測試用的範例檔，客戶端照範例檔寫。**所以開始實作前，使用者要先設好 `GEMINI_API_KEY`。**
+- 文件沒有列出回應 JSON 的完整欄位，所以先用真的 key 打了六次 API，把請求和回應存在
+  `robot_dog_agent/test/data/`，客戶端照這些範例檔寫、也用它們測試。實測（2026-11-10，`gemini-3.6-flash`）：
+  - 上表的請求欄位全部被接受；`system_instruction` 是字串。
+  - 回應有 `id`、`status`（`completed` 或 `requires_action`）、`steps`、`usage`。文字回覆在
+    `type: "model_output"` 的 step 的 `content[].text`；另外有 `type: "thought"` 的 step（只有簽章），忽略即可。
+  - 「先去廚房，再回起點」在同一個回應裡給了兩個 `function_call`。
+  - 不存在的 `previous_interaction_id` 回 `400`，訊息只有「Request contains an invalid argument.」，
+    和其他參數錯誤分不出來。
+  - 無效的 key 也是回 `400`（不是 `401`），回應內容是只有一個元素的 list，訊息含「API key not valid」。
 
 ## 3. 架構
 
@@ -188,8 +195,10 @@ ros2 run robot_dog_agent chat [--slam] [--model gemini-3.6-flash] [--no-robot]
 |---|---|
 | `429` | 印「被限流，等 N 秒」，依 `Retry-After` 等待，沒有就等 10、20、40 秒；最多重試 3 次 |
 | `5xx`、連線逾時（60 秒）、連不上 | 同上的等待與重試 |
-| `400`、`401`、`403`、`404` | 不重試；丟出例外，訊息取自回應內容 |
-| `previous_interaction_id` 已過期或不存在 | 不帶 id 重送一次，並印「之前的對話已過期，重新開始」 |
+| 其他 `4xx` | 不重試；丟出例外，訊息取自回應內容；訊息含「API key」時提示檢查 `GEMINI_API_KEY` |
+| 帶著 `previous_interaction_id` 送文字時回 `400` | 當成對話已過期（實測分不出來）：印「之前的對話已過期，重新開始」，不帶 id 重送一次；還是失敗就丟出例外 |
+| 帶著 `previous_interaction_id` 送工具結果時回 `400` | 丟出例外（結果對應的工具呼叫已經不在了，沒辦法重送到新對話） |
+| `Retry-After` 超過 120 秒 | 不等，丟出例外並說明要等多久（多半是每日額度用完） |
 | 重試用完 | 丟出例外 |
 
 `chat` 接到例外時印出訊息、放棄這一句，回到輸入提示；這時狗一定是停著的（工具呼叫之間沒有進行中的目標）。

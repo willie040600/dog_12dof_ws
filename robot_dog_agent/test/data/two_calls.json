@@ -1,0 +1,134 @@
+{
+ "request": {
+  "model": "gemini-3.6-flash",
+  "input": "先去廚房，再回起點",
+  "system_instruction": "You control a quadruped robot dog in a simulated apartment through the tools. The user types commands in Chinese.\n\nCoordinates: map frame, metres. The dog started at (0, 0) facing +x; +y is to its left when it faces +x.\nAngles are degrees, counter-clockwise (a left turn) positive.\n\nPlaces (id: name, x, y):\n- start: 起點（客廳中央，沙發和電視櫃之間）, (0.0, 0.0)\n- living_room: 客廳西側, (-2.5, -0.3)\n- master_bedroom: 主臥室, (-1.5, 3.0)\n- second_bedroom: 次臥室, (3.0, 2.2)\n- dining_table: 餐桌旁（餐桌東側，面向餐桌）, (3.6, 0.3)\n- kitchen: 廚房（流理台前，面向流理台）, (2.5, -0.6)\n- entrance: 玄關（面向大門）, (-2.0, -0.9)\n- bathroom_door: 浴室門口（門外，面向浴室）, (3.6, -0.5)\n\nRules:\n- For a named place always call go_to_place with its id. Never guess coordinates for a place or an object that is\n  not in the list; say you do not know where it is.\n- For forward / back / left / right / turn commands call move_relative.\n- For several steps in one command, call the tools in the order the user gave.\n- When a tool returns status \"blocked\", tell the user the reason. Do not try a nearby point unless the user asks.\n- When a tool returns any status other than \"ok\" or \"reached\", stop and tell the user what happened.\n- Do not call a navigation tool for a question that needs no movement. Use get_pose to answer where the dog is.\n- Reply in Traditional Chinese (Taiwan), in one or two short sentences.\n",
+  "tools": [
+   {
+    "type": "function",
+    "name": "get_pose",
+    "description": "Where the robot is now: position, heading, area and nearest named place. Does not move the robot.",
+    "parameters": {
+     "type": "object",
+     "properties": {}
+    }
+   },
+   {
+    "type": "function",
+    "name": "go_to_place",
+    "description": "Walk to a named place and face the way listed for it.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "place": {
+       "type": "string",
+       "enum": [
+        "start",
+        "living_room",
+        "master_bedroom",
+        "second_bedroom",
+        "dining_table",
+        "kitchen",
+        "entrance",
+        "bathroom_door"
+       ]
+      }
+     },
+     "required": [
+      "place"
+     ]
+    }
+   },
+   {
+    "type": "function",
+    "name": "go_to_pose",
+    "description": "Walk to map coordinates in metres. Without yaw_deg the robot ends facing its direction of travel.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "x": {
+       "type": "number"
+      },
+      "y": {
+       "type": "number"
+      },
+      "yaw_deg": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "x",
+      "y"
+     ]
+    }
+   },
+   {
+    "type": "function",
+    "name": "move_relative",
+    "description": "Move relative to the current pose: forward_m (negative = back), left_m (negative = right), turn_left_deg (negative = right turn).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "forward_m": {
+       "type": "number"
+      },
+      "left_m": {
+       "type": "number"
+      },
+      "turn_left_deg": {
+       "type": "number"
+      }
+     }
+    }
+   }
+  ]
+ },
+ "http_status": 200,
+ "retry_after": null,
+ "body": {
+  "id": "v1_Chc3OG55YXZpX0JJeTMxZThQNVp5N3lRYxIXNzhueWF2aV9CSXkzMWU4UDVaeTd5UWM",
+  "status": "requires_action",
+  "usage": {
+   "total_tokens": 1085,
+   "total_input_tokens": 782,
+   "input_tokens_by_modality": [
+    {
+     "modality": "text",
+     "tokens": 782
+    }
+   ],
+   "total_cached_tokens": 0,
+   "total_output_tokens": 36,
+   "total_tool_use_tokens": 0,
+   "total_thought_tokens": 267,
+   "initial_input_tokens": 782
+  },
+  "created": "2026-11-10T07:38:55Z",
+  "updated": "2026-11-10T07:38:55Z",
+  "service_tier": "standard",
+  "steps": [
+   {
+    "signature": "Ep4ICpsIAWkUfRPLdY7uUZlOfDdTeM6PAWZWuCXq6QmwEpwvAvEsQwfnpaBkrWi1vEJHKr2wnz4kWufFxzrUWXWXyv5ZBNZmEcC+bAwPSGPlnq0VbsIo3vSE+PZuFNnD3zqTD3BqtNDEFK7p61uMuMN8Ot7D9OqHlk3BijIxpU7bGN3c49zbr6UwOtbX26gAp0ZpOylFOHwOhu/RCJ05DZEyUPupUcQHG3aTWDqYQe+AZLsIYhoatZDLqqmh6ZZdM2/JI0l+pKjkXa0PT1pGMN+Ir3GXoKM7zP/URcL6XrbPkPfx20TF/uDgV/BPOU+7sE8EQr/KY8RakZf+/Wg9vSMQwv5WqFIcQXpObBBmZjaHM7M/bVxlGR/xZKlxeHzWtKq6R87hdbYB6V1HO/Bp27D2U4L0Qz7ip8jP34agSST/+ZsOd822Kn5U90sE27ZF2mMwP7mySlwLZuhk9xN2ELXDNv/3IBQQb8q4wHNo3zhhdYdhEclkItPWuWr7mTzZgvOlQ/I7PiUqFmyjs9cNciMJpM9ISAZHZfHSgQztPv/dLmZOOsk0wg+a151QtFDpQ9VsHNReFAiIyTFqpHbS/zz3LZpJcXFdQY0yY9TYqGsiGO4YKpaOZKqvH/jAVFnTvCcltnmHp+qQj+HCXCJx1WC29g+6/mtO7ONsUQdNx2aH8bIMLZE1b4klg6/eb70IMNLLILuFOW50Rr+hHh9g9vpyFaEL6MnSjF+re/FhDVLMrLJwp6o17GyQVZkPzNiJsEfcYfVCKxR2+bAQW1uYKOioSzm13mRzIfGtD7hfFmMkZFhWvhTXOGEuc/rr5vYsPomdfM2+se6dDGryLV6EWWcEQ662vqRJSx/eU2XR1UGSHIT4BLVzEO2cEWB0MMmOz4zXAjzWluRkLjFy5lxnt944wWvGcyEufG2mO/sg62koOmdtL1xDa+t0QASPQjpGO72Xb14bwtn7G7I2sl3MAdt82m8uFrEPtG2eouUpMi76fiaaTKMEStw2ApaJg/equ24iGNGee05xP9LU+D+zhF1tlez4KamvwjqAHexKik4jHm3SKM5eFgHm1RWBgQzyz2wAYQf1n06G5Y8CULK8RSi4MDsy9RSiAQN6Quym2RP7VUt0tCXFSzOb0mZ01fX5TQTNlV+/9Pf75wYyDdkg1/iB7oE2AAr6Gzev8bsiWm0AHaqGjIdENXZy48HHTqLpalnrMqcEDz3W7FvP5ldVhJkQTP4FKyZKmKuBCbDm1DHzmqBkv9lDOTNHANSlJutbKMEREObX4pZQvxR2oQZ5rAsM2Q+kn9Ecw7w8epJYaO9QP6YQ/KEjHV0PQgx5ctP3dUCJn08cq/seISDK/CTkhskeJNWAvkdrb8daZSbXNvJ1jYcuw21E9zAIp9zDVQN3vw==",
+    "type": "thought"
+   },
+   {
+    "id": "call_5965790457075493263",
+    "type": "function_call",
+    "name": "go_to_place",
+    "arguments": {
+     "place": "kitchen"
+    }
+   },
+   {
+    "id": "call_5965790457075492750",
+    "type": "function_call",
+    "name": "go_to_place",
+    "arguments": {
+     "place": "start"
+    }
+   }
+  ],
+  "object": "interaction",
+  "model": "gemini-3.6-flash"
+ }
+}

@@ -1,0 +1,140 @@
+{
+ "request": {
+  "model": "gemini-3.6-flash",
+  "input": [
+   {
+    "type": "function_result",
+    "name": "go_to_place",
+    "call_id": "call_13844429192700645169",
+    "result": [
+     {
+      "type": "text",
+      "text": "{\"status\": \"reached\", \"x\": 2.5, \"y\": -0.6, \"yaw_deg\": -90, \"seconds\": 20.0}"
+     }
+    ]
+   }
+  ],
+  "system_instruction": "You control a quadruped robot dog in a simulated apartment through the tools. The user types commands in Chinese.\n\nCoordinates: map frame, metres. The dog started at (0, 0) facing +x; +y is to its left when it faces +x.\nAngles are degrees, counter-clockwise (a left turn) positive.\n\nPlaces (id: name, x, y):\n- start: 起點（客廳中央，沙發和電視櫃之間）, (0.0, 0.0)\n- living_room: 客廳西側, (-2.5, -0.3)\n- master_bedroom: 主臥室, (-1.5, 3.0)\n- second_bedroom: 次臥室, (3.0, 2.2)\n- dining_table: 餐桌旁（餐桌東側，面向餐桌）, (3.6, 0.3)\n- kitchen: 廚房（流理台前，面向流理台）, (2.5, -0.6)\n- entrance: 玄關（面向大門）, (-2.0, -0.9)\n- bathroom_door: 浴室門口（門外，面向浴室）, (3.6, -0.5)\n\nRules:\n- For a named place always call go_to_place with its id. Never guess coordinates for a place or an object that is\n  not in the list; say you do not know where it is.\n- For forward / back / left / right / turn commands call move_relative.\n- For several steps in one command, call the tools in the order the user gave.\n- When a tool returns status \"blocked\", tell the user the reason. Do not try a nearby point unless the user asks.\n- When a tool returns any status other than \"ok\" or \"reached\", stop and tell the user what happened.\n- Do not call a navigation tool for a question that needs no movement. Use get_pose to answer where the dog is.\n- Reply in Traditional Chinese (Taiwan), in one or two short sentences.\n",
+  "tools": [
+   {
+    "type": "function",
+    "name": "get_pose",
+    "description": "Where the robot is now: position, heading, area and nearest named place. Does not move the robot.",
+    "parameters": {
+     "type": "object",
+     "properties": {}
+    }
+   },
+   {
+    "type": "function",
+    "name": "go_to_place",
+    "description": "Walk to a named place and face the way listed for it.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "place": {
+       "type": "string",
+       "enum": [
+        "start",
+        "living_room",
+        "master_bedroom",
+        "second_bedroom",
+        "dining_table",
+        "kitchen",
+        "entrance",
+        "bathroom_door"
+       ]
+      }
+     },
+     "required": [
+      "place"
+     ]
+    }
+   },
+   {
+    "type": "function",
+    "name": "go_to_pose",
+    "description": "Walk to map coordinates in metres. Without yaw_deg the robot ends facing its direction of travel.",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "x": {
+       "type": "number"
+      },
+      "y": {
+       "type": "number"
+      },
+      "yaw_deg": {
+       "type": "number"
+      }
+     },
+     "required": [
+      "x",
+      "y"
+     ]
+    }
+   },
+   {
+    "type": "function",
+    "name": "move_relative",
+    "description": "Move relative to the current pose: forward_m (negative = back), left_m (negative = right), turn_left_deg (negative = right turn).",
+    "parameters": {
+     "type": "object",
+     "properties": {
+      "forward_m": {
+       "type": "number"
+      },
+      "left_m": {
+       "type": "number"
+      },
+      "turn_left_deg": {
+       "type": "number"
+      }
+     }
+    }
+   }
+  ],
+  "previous_interaction_id": "v1_Chcyc255YXZ5OUxkWEEwLWtQbXBfQ21BVRIXMnNueWF2eTlMZFhBMC1rUG1wX0NtQVU"
+ },
+ "http_status": 200,
+ "retry_after": null,
+ "body": {
+  "id": "v1_Chcyc255YXZ5OUxkWEEwLWtQbXBfQ21BVRIXNU1ueWFyYlRHcWpmMWU4UDJxdnJpQTg",
+  "status": "completed",
+  "usage": {
+   "total_tokens": 972,
+   "total_input_tokens": 944,
+   "input_tokens_by_modality": [
+    {
+     "modality": "text",
+     "tokens": 944
+    }
+   ],
+   "total_cached_tokens": 0,
+   "total_output_tokens": 9,
+   "total_tool_use_tokens": 0,
+   "total_thought_tokens": 19,
+   "initial_input_tokens": 944
+  },
+  "created": "2026-11-10T07:38:19Z",
+  "updated": "2026-11-10T07:38:19Z",
+  "service_tier": "standard",
+  "steps": [
+   {
+    "signature": "EssBCsgBAWkUfRNbb8nv+N79Y9JkFvU/JK4mmHV1Rg1PtRm+2/BGTJdMdjWkYsnLV/D/cqGjx7BkX00PBI3KEXERLdWiGWDDt4tbqOxQgpjobg7OGydWlq/ck6/w8nB5t9SwTo/AEoS+gKHPz97zpQeLveWcgEuj1bsPL7SeHnzeFL935HH5O23FYN6auLoQeCYB8+eXDlVvWh7qOImNPyf6xz+2F6KPePuOVJ2ptXQWI+WEGD4GoKDgBTrxtmgKritQ489lfyp8DiI0F4I=",
+    "type": "thought"
+   },
+   {
+    "content": [
+     {
+      "text": "好的，我已經到達廚房了。",
+      "type": "text"
+     }
+    ],
+    "type": "model_output"
+   }
+  ],
+  "object": "interaction",
+  "model": "gemini-3.6-flash"
+ }
+}
