@@ -41,10 +41,10 @@ def judge_kitchen_then_start(obs):
     return at_place(obs.after, 'start')
 
 
-def judge_one_metre_forward(obs):
+def judge_half_a_metre_forward(obs):
     dx, dy, yaw = obs.after[0] - obs.before[0], obs.after[1] - obs.before[1], obs.before[2]
     along, across = dx * math.cos(yaw) + dy * math.sin(yaw), -dx * math.sin(yaw) + dy * math.cos(yaw)
-    return (abs(along - 1.0) <= XY_TOLERANCE and abs(across) <= XY_TOLERANCE,
+    return (abs(along - 0.5) < XY_TOLERANCE and abs(across) < XY_TOLERANCE,
             'moved %.2f m forward and %.2f m sideways' % (along, across))
 
 
@@ -73,7 +73,8 @@ def unless_fallen(judge):
 CASES = tuple((sentence, unless_fallen(judge)) for sentence, judge in (
     ('去主臥室', judge_master_bedroom),
     ('先去廚房，再回起點', judge_kitchen_then_start),
-    ('往前走一公尺', judge_one_metre_forward),
+    # half a metre: a whole one from the start, 0.3 rad off its heading, ends too close to the side chair
+    ('往前走半公尺', judge_half_a_metre_forward),
     ('向左轉 90 度', judge_turn_left),
     ('去座標 (0.4, 2.7)', judge_stays_put),          # the middle of the bed: must be refused
     ('你現在在哪裡', judge_answers_without_moving),

@@ -19,7 +19,7 @@ def ok(n, **kw):
 
 
 def test_sentences():
-    assert [s for s, _ in CASES] == ['去主臥室', '先去廚房，再回起點', '往前走一公尺', '向左轉 90 度', '去座標 (0.4, 2.7)',
+    assert [s for s, _ in CASES] == ['去主臥室', '先去廚房，再回起點', '往前走半公尺', '向左轉 90 度', '去座標 (0.4, 2.7)',
                                      '你現在在哪裡']
 
 
@@ -37,12 +37,14 @@ def test_case_2_kitchen_then_start():
     assert not ok(2, nav_ends=[(K.x, K.y, K.yaw)], after=(K.x, K.y, K.yaw), goals_sent=1)   # stayed in the kitchen
 
 
-def test_case_3_one_metre_forward():
+def test_case_3_half_a_metre_forward():
     up = (0.0, 0.0, math.pi / 2)
-    assert ok(3, before=up, after=(0.1, 1.1, math.pi / 2), goals_sent=1)
-    assert not ok(3, before=up, after=(0.0, 0.7, math.pi / 2), goals_sent=1)
-    assert not ok(3, before=up, after=(0.3, 1.0, math.pi / 2), goals_sent=1)
-    assert not ok(3, before=up, after=(0.0, -1.0, math.pi / 2), goals_sent=1)   # went backwards
+    assert ok(3, before=up, after=(0.1, 0.6, math.pi / 2), goals_sent=1)
+    assert not ok(3, before=up, after=(0.0, 0.2, math.pi / 2), goals_sent=1)
+    assert not ok(3, before=up, after=(0.0, 0.8, math.pi / 2), goals_sent=1)    # a whole metre is too far
+    assert not ok(3, before=up, after=(0.3, 0.5, math.pi / 2), goals_sent=1)
+    assert not ok(3, before=up, after=(0.0, -0.5, math.pi / 2), goals_sent=1)   # went backwards
+    assert not ok(3, before=up, after=up)                                       # refused and stayed
 
 
 def test_case_4_turn_left():
@@ -69,7 +71,7 @@ def test_case_6_where_am_i():
 def test_a_fall_fails_every_case():
     good = [dict(after=(MB.x, MB.y, MB.yaw), goals_sent=1),
             dict(nav_ends=[(K.x, K.y, K.yaw), (0.0, 0.0, 0.0)], goals_sent=2),
-            dict(after=(1.0, 0.0, 0.0), goals_sent=1), dict(after=(0.0, 0.0, math.pi / 2), goals_sent=1), {}, {}]
+            dict(after=(0.5, 0.0, 0.0), goals_sent=1), dict(after=(0.0, 0.0, math.pi / 2), goals_sent=1), {}, {}]
     for n, kw in enumerate(good, 1):
         assert ok(n, **kw), n
         passed, why = JUDGE[n - 1](obs(fell=True, **kw))

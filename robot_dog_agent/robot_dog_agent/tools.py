@@ -2,6 +2,7 @@
 import math
 
 from robot_dog_agent import places
+from robot_dog_agent.robot import SAME_SPOT
 
 NUMBER = {'type': 'number'}
 DECLARATIONS = [
@@ -26,7 +27,6 @@ DECLARATIONS = [
                     'properties': {'forward_m': NUMBER, 'left_m': NUMBER, 'turn_left_deg': NUMBER}}},
 ]
 MAX_RELATIVE = 5.0   # m, per axis of move_relative
-SAME_SPOT = 0.1      # m; a go_to_pose target this close keeps the current heading
 
 INSTRUCTION = """\
 You control a quadruped robot dog in a simulated apartment through the tools. The user types commands in Chinese.

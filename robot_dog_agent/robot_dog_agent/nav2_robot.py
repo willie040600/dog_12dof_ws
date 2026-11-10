@@ -9,7 +9,7 @@ from rclpy.signals import SignalHandlerOptions
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformException, TransformListener
 
-from robot_dog_agent.robot import NavResult
+from robot_dog_agent.robot import NavResult, turn_in_place
 from robot_dog_navigation.nav_eval import make_pose, sim_seconds, yaw_of
 
 PROGRESS_PERIOD = 2.0  # s of wall time between on_progress calls
@@ -53,7 +53,16 @@ class Nav2Robot:
 
     def go_to(self, x, y, yaw, on_progress=None):
         nav = self.node
-        if not nav.goToPose(make_pose(nav, x, y, yaw)):
+        angle = turn_in_place(self.pose(), x, y, yaw)
+        if angle is None:
+            accepted = nav.goToPose(make_pose(nav, x, y, yaw))
+        elif abs(angle) < 0.02:
+            return NavResult('reached', '', 0.0)
+        else:
+            # a turn on the spot: Nav2's spin ends about 5 deg past the angle (measured); a goal at the same
+            # position stops as soon as it is within the goal checker's 0.25 rad, about 12 deg short
+            accepted, on_progress = nav.spin(spin_dist=angle, time_allowance=30), None
+        if not accepted:
             return NavResult('failed', 'Nav2 rejected the goal', 0.0)
         t0, last, ended = sim_seconds(nav), time.monotonic(), None
         try:

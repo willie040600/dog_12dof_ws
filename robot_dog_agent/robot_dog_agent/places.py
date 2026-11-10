@@ -62,7 +62,7 @@ def check_target(truth, x, y):
         return 'not connected to the free space the robot is in (inside furniture or a closed-off area)'
     gap = clearance(truth, x, y)
     if gap < MIN_CLEARANCE - 1e-9:
-        return 'only %.2f m from an obstacle, needs %.2f m' % (gap, MIN_CLEARANCE)
+        return 'the target point is only %.2f m from an obstacle; the robot needs %.2f m of room' % (gap, MIN_CLEARANCE)
     return None
 
 

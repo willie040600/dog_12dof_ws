@@ -6,9 +6,18 @@ A robot has
         on_progress(distance_remaining) now and then on the way
 nav2_robot.Nav2Robot is the real one.
 """
+import math
 from collections import namedtuple
 
 NavResult = namedtuple('NavResult', 'status reason seconds')  # status: reached / failed / timeout / canceled
+SAME_SPOT = 0.1  # m; a target this close to the robot is where it already stands
+
+
+def turn_in_place(pose, x, y, yaw):
+    """The signed angle (rad, the short way round) to turn when (x, y) is where the robot stands, else None."""
+    if math.hypot(x - pose[0], y - pose[1]) >= SAME_SPOT:
+        return None
+    return math.pi - (math.pi - (yaw - pose[2])) % (2.0 * math.pi)
 
 
 class FakeRobot:

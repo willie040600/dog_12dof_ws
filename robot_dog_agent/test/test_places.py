@@ -34,7 +34,8 @@ def test_check_target_reasons():
     assert places.check_target(TRUTH, 20.0, 0.0) == 'outside the map'
     assert places.check_target(TRUTH, -3.45, 0.0) == 'on an obstacle'           # the west wall
     assert places.check_target(TRUTH, 0.4, 2.7).startswith('not connected')     # the middle of the bed
-    assert places.check_target(TRUTH, 0.0, -0.55) == 'only 0.25 m from an obstacle, needs 0.30 m'   # by the sofa
+    assert places.check_target(TRUTH, 0.0, -0.55) == \
+        'the target point is only 0.25 m from an obstacle; the robot needs 0.30 m of room'   # by the sofa
 
 
 def test_area_and_nearest():

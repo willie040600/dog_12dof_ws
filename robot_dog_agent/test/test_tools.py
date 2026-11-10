@@ -1,7 +1,9 @@
 import math
 
+import pytest
+
 from robot_dog_agent import places, tools
-from robot_dog_agent.robot import FakeRobot, NavResult
+from robot_dog_agent.robot import FakeRobot, NavResult, turn_in_place
 from robot_dog_agent.tools import Toolbox
 
 TRUTH = places.load_body_truth()
@@ -89,3 +91,10 @@ def test_progress_is_passed_on():
     robot = FakeRobot()
     Toolbox(robot, TRUTH, on_progress=seen.append).call('go_to_place', {'place': 'kitchen'})
     assert robot.progress_callbacks == [seen.append]
+
+
+def test_turn_in_place_is_a_target_on_the_spot():
+    assert turn_in_place((1.0, 2.0, 0.0), 1.05, 2.0, math.pi / 2) == pytest.approx(math.pi / 2)
+    assert turn_in_place((1.0, 2.0, 3.0), 1.0, 2.0, -3.0) == pytest.approx(2 * math.pi - 6.0)   # the short way round
+    assert turn_in_place((1.0, 2.0, 0.0), 1.0, 2.0, 0.0) == 0.0
+    assert turn_in_place((1.0, 2.0, 0.0), 1.2, 2.0, 1.0) is None                                # a walk, not a turn
