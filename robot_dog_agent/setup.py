@@ -17,6 +17,8 @@ setup(
     description='Natural-language commands for robot_dog: a Gemini agent that sends goals to Nav2',
     license='Apache-2.0',
     entry_points={
-        'console_scripts': [],
+        'console_scripts': [
+            'chat = robot_dog_agent.chat:main',
+        ],
     },
 )

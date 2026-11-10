@@ -28,7 +28,7 @@
 - 相機與視覺問答、語音、巡邏報告、語意地圖（之後各自一份 spec）。
 - 程式重開後還記得之前的對話。
 - 真實機器狗；一次指揮多隻狗；回覆逐字串流。
-- 建圖模式（`--slam`）可以用，但不列入驗收：主臥門口偶爾卡住是已知問題。
+- 建圖模式可以用，但不列入驗收：主臥門口偶爾卡住是已知問題。
 
 ## 2. Gemini API（2026-11-10 查官方文件）
 
@@ -176,12 +176,14 @@ system instruction 的內容：
 ### 5.3 終端機對話（`chat.py`）
 
 ```
-ros2 run robot_dog_agent chat [--slam] [--model gemini-3.6-flash] [--no-robot]
+ros2 run robot_dog_agent chat [--model gemini-3.6-flash] [--no-robot]
 ```
 
 - 啟動時檢查 `GEMINI_API_KEY`；沒有就印出申請和設定方法後結束（不啟動 ROS）。
-- 等 Nav2 啟動完成（和 `nav_eval` 一樣，`--slam` 決定等哪個定位節點），印出地點清單，開始讀輸入。
-- 導航中每 2 秒印一次剩餘距離。
+- 等 Nav2 啟動完成、而且拿得到 map→base_footprint（最多等 60 秒），印出地點清單，開始讀輸入。定位模式和
+  建圖模式都一樣，不需要旗標。**不設定 AMCL 的初始位置**：`BasicNavigator.waitUntilNav2Active(localizer='amcl')`
+  會往原點發一個初始位置，狗不在原點時啟動對話會讓 AMCL 定位跑掉（實測：下一個目標規劃失敗），所以不用它。
+- 導航中每 2 秒印一次剩餘距離（Nav2 還沒有路徑時回報 0，不印）。輸出立即送出，接管線時也看得到進度。
 - **導航中按 Ctrl+C**：取消 Nav2 目標，工具結果是 `canceled`，後面的呼叫 `skipped`，結果照常送回 Gemini
   （否則伺服器上的對話會停在沒有結果的工具呼叫），印出它的回覆，回到輸入提示。
 - **輸入提示下按 Ctrl+C、Ctrl+D，或輸入 `exit`**：結束程式。
