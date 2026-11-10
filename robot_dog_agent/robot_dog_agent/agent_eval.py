@@ -1,6 +1,6 @@
 """Six spoken commands through Gemini and Nav2, judged with ground truth (spec 2026-11-10, 7).
 
-    ros2 run robot_dog_agent agent_eval [--model gemini-3.6-flash]
+    ros2 run robot_dog_agent agent_eval [--model gemini-3.5-flash-lite]
 Needs GEMINI_API_KEY and a freshly started Isaac Sim + nav.launch.py in AMCL mode (the dog at the origin).
 Prints one [AGENT] line per sentence and [AGENT] PASS k/6; exit code 0 only when all six pass.
 """

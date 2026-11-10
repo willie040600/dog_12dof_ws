@@ -117,9 +117,14 @@ def test_gives_up_after_three_retries():
 
 def test_a_long_retry_after_is_not_waited_for():
     c, post, sleeps, _ = client([Response(429, {'error': {'message': 'daily quota'}}, retry_after='3600')])
-    with pytest.raises(GeminiError, match='3600'):
+    with pytest.raises(GeminiError, match='約 1.0 小時'):
         c.send(text='哈囉')
     assert sleeps == [] and len(post.calls) == 1
+
+
+def test_waiting_times_are_readable():
+    assert [gemini.duration(s) for s in (45, 170, 3599, 3600, 85169)] == \
+        ['45 秒', '約 3 分鐘', '約 60 分鐘', '約 1.0 小時', '約 23.7 小時']
 
 
 def test_connection_errors_are_retried():

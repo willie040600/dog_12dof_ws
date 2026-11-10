@@ -65,6 +65,11 @@ def test_main_without_a_key(monkeypatch, capsys):
     assert 'GEMINI_API_KEY' in out and 'aistudio.google.com' in out and '.bashrc' in out
 
 
+def test_default_model_has_a_usable_free_quota():
+    # gemini-3.6-flash allows 20 requests per day on the free tier (measured 2026-11-10): eight commands
+    assert chat.DEFAULT_MODEL == 'gemini-3.5-flash-lite'
+
+
 def test_build_agent_with_the_fake_robot():
     said = []
     agent = chat.build_agent(FakeRobot(), 'k', 'gemini-3.6-flash', say=said.append)

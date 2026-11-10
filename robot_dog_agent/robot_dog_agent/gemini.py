@@ -13,6 +13,15 @@ from robot_dog_agent.agent import Call, Reply
 LONGEST_WAIT = 120  # s; a Retry-After beyond this (a used-up daily quota) is reported instead of waited for
 
 
+def duration(seconds):
+    """A waiting time the way a person would say it."""
+    if seconds < 120:
+        return '%.0f 秒' % seconds
+    if seconds < 3600:
+        return '約 %.0f 分鐘' % (seconds / 60.0)
+    return '約 %.1f 小時' % (seconds / 3600.0)
+
+
 class GeminiError(Exception):
     """A request that failed for good; the message is for the user."""
 
@@ -101,7 +110,7 @@ class GeminiClient:
                 except ValueError:
                     pass
                 if wait and wait > LONGEST_WAIT:
-                    raise GeminiError('Gemini 的額度用完了，要等 %.0f 秒才能再試（%s）' % (wait, problem))
+                    raise GeminiError('Gemini 的額度用完了，要等%s才能再試（%s）' % (duration(wait), problem))
             if wait is None:
                 raise GeminiError('Gemini 沒有回應，已重試 %d 次（%s）' % (len(self.RETRY_WAITS), problem))
             self.say('%s，等 %.0f 秒再試（%s）' % ('被限流' if limited else '伺服器沒有回應', wait, problem))

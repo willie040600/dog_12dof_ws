@@ -1,6 +1,6 @@
 """Talk to the robot dog in the terminal (spec 2026-11-10, 5.3).
 
-    ros2 run robot_dog_agent chat [--model gemini-3.6-flash] [--no-robot]
+    ros2 run robot_dog_agent chat [--model gemini-3.5-flash-lite] [--no-robot]
 Needs GEMINI_API_KEY, and Isaac Sim with nav.launch.py running unless --no-robot (a stand-in robot that arrives
 at once: no ROS, for trying the conversation). Ctrl+C during a navigation cancels it; exit ends the chat.
 """
@@ -15,7 +15,7 @@ from robot_dog_agent.agent import Agent
 from robot_dog_agent.gemini import GeminiClient, GeminiError
 from robot_dog_agent.robot import FakeRobot
 
-DEFAULT_MODEL = 'gemini-3.6-flash'
+DEFAULT_MODEL = 'gemini-3.5-flash-lite'  # gemini-3.6-flash: only 20 requests per day on the free tier
 NO_KEY = """找不到環境變數 GEMINI_API_KEY。
 1. 到 https://aistudio.google.com/ 申請 API key（免費額度就夠用）。
 2. 在 ~/.bashrc 加一行：export GEMINI_API_KEY=你的key
