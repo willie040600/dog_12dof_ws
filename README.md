@@ -34,13 +34,13 @@ git clone https://github.com/willie040600/dog_12dof_ws.git ~/dog_12dof_ws
 ```
 
 ```bash
-cd ~/dog_12dof_ws && source /opt/ros/jazzy/setup.bash && rosdep update && rosdep install --from-paths robot_dog_description robot_dog_navigation --ignore-src -y
+cd ~/dog_12dof_ws && source /opt/ros/jazzy/setup.bash && rosdep update && rosdep install --from-paths robot_dog_description robot_dog_navigation robot_dog_agent --ignore-src -y
 ```
 
 `rosdep` 也會裝 Gazebo 模式要用的套件，導航用不到它們。
 
 ```bash
-cd ~/dog_12dof_ws && source /opt/ros/jazzy/setup.bash && colcon build --symlink-install --packages-select robot_dog_description robot_dog_navigation
+cd ~/dog_12dof_ws && source /opt/ros/jazzy/setup.bash && colcon build --symlink-install --packages-select robot_dog_description robot_dog_navigation robot_dog_agent
 ```
 
 ### 3. Isaac Lab
@@ -84,6 +84,21 @@ ros2 launch robot_dog_navigation nav.launch.py slam:=False
 
 `slam:=False` 用 repo 裡的地圖定位；不加就是邊走邊建圖。在 RViz 按 **Nav2 Goal**，再點地圖上的目標。
 
+## 用中文指揮機器狗
+
+Nav2 啟動後，可以在第三個終端機用自然語言下指令（需要 Google AI Studio 的免費 Gemini API key）：
+
+```bash
+cd ~/dog_12dof_ws && source install/setup.bash
+ros2 run robot_dog_agent chat
+```
+
+```
+你> 先去廚房，再回起點
+```
+
+申請 key、能說的話、地點表和限制見 [robot_dog_agent/README.md](robot_dog_agent/README.md)。
+
 ## 確認裝好了
 
 Nav2 啟動後，開第三個終端機，讓機器狗自動走完五個目標：
@@ -105,6 +120,10 @@ cd ~/dog_12dof_ws/robot_dog_description/isaac && python3 -m pytest tests -q
 cd ~/dog_12dof_ws/robot_dog_navigation && python3 -m pytest -q
 ```
 
+```bash
+cd ~/dog_12dof_ws/robot_dog_agent && python3 -m pytest test -q
+```
+
 ## 常見問題
 
 | 狀況 | 怎麼處理 |
@@ -121,6 +140,7 @@ cd ~/dog_12dof_ws/robot_dog_navigation && python3 -m pytest -q
 | `robot_dog_description/` | 機器人模型、Isaac Sim 腳本、公寓場景、策略 | [README](robot_dog_description/README.md) |
 | `robot_dog_description/isaaclab/` | 用 Isaac Lab 訓練行走策略 | [README](robot_dog_description/isaaclab/README.md) |
 | `robot_dog_navigation/` | Nav2、SLAM / AMCL、地圖、評估腳本 | [README](robot_dog_navigation/README.md) |
+| `robot_dog_agent/` | 用中文下指令的 Gemini agent | [README](robot_dog_agent/README.md) |
 | `docs/superpowers/` | 設計規格與實作計畫 | |
 
 ## 授權
