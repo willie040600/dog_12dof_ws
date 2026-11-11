@@ -4,6 +4,10 @@ A robot has
     pose() -> (x, y, yaw) in the map frame; raises RuntimeError when it is not known
     go_to(x, y, yaw, on_progress=None) -> NavResult; blocks until the navigation ends and calls
         on_progress(distance_remaining) now and then on the way
+    cancel(); from any thread: ends the navigation under way as 'canceled', or, when there is none, makes the
+        next go_to return 'canceled' without moving. One cancel ends one navigation.
+    clear_cancel(); forgets a cancel that has not been used
+    close()
 nav2_robot.Nav2Robot is the real one.
 """
 import math
@@ -11,6 +15,7 @@ from collections import namedtuple
 
 NavResult = namedtuple('NavResult', 'status reason seconds')  # status: reached / failed / timeout / canceled
 SAME_SPOT = 0.1  # m; a target this close to the robot is where it already stands
+CANCELED = 'canceled by the user'
 
 
 def turn_in_place(pose, x, y, yaw):
@@ -29,13 +34,27 @@ class FakeRobot:
         self.goals = []
         self.progress_callbacks = []
         self.pose_error = None  # set to a message to make pose() fail
+        self.closed = False
+        self._cancel = False
 
-    def pose(self):
+    def pose(self, wait=None):
         if self.pose_error:
             raise RuntimeError(self.pose_error)
         return self._pose
 
+    def cancel(self):
+        self._cancel = True
+
+    def clear_cancel(self):
+        self._cancel = False
+
+    def close(self):
+        self.closed = True
+
     def go_to(self, x, y, yaw, on_progress=None):
+        if self._cancel:
+            self._cancel = False
+            return NavResult('canceled', CANCELED, 0.0)
         self.goals.append((x, y, yaw))
         self.progress_callbacks.append(on_progress)
         result = self.results.pop(0) if self.results else NavResult('reached', '', 1.0)

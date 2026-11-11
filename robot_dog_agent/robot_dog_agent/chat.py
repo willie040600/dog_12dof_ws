@@ -32,8 +32,11 @@ def usable_key(raw):
     return key
 
 
-def build_agent(robot, api_key, model, say=print, on_call=None):
-    """An Agent on Gemini that drives `robot`; progress and tool calls are reported through say."""
+def build_agent(robot, api_key, model, say=print, on_call=None, on_progress=None):
+    """An Agent on Gemini that drives `robot`; progress and tool calls are reported through say.
+
+    on_progress(distance) takes the progress instead of say (the window shows it in its status bar).
+    """
     def show_call(call, result):
         reason = '（%s）' % result['reason'] if result.get('reason') else ''
         say('  [工具] %s %s → %s%s' % (call.name, json.dumps(call.args, ensure_ascii=False), result.get('status'),
@@ -45,7 +48,7 @@ def build_agent(robot, api_key, model, say=print, on_call=None):
         if distance > 0.0:  # 0: Nav2 has no path (yet)
             say('  剩 %.1f m' % distance)
 
-    toolbox = tools.Toolbox(robot, places.load_body_truth(), on_progress=show_progress)
+    toolbox = tools.Toolbox(robot, places.load_body_truth(), on_progress=on_progress or show_progress)
     llm = GeminiClient(api_key, model, tools.system_instruction(), tools.DECLARATIONS, say=say)
     return Agent(llm, toolbox, on_call=show_call)
 

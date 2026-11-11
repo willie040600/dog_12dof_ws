@@ -1,4 +1,5 @@
 """The robot behind the tools: goals to Nav2, the pose from TF (spec 2026-11-10, 5.3). Needs rclpy."""
+import threading
 import time
 
 import rclpy
@@ -9,7 +10,7 @@ from rclpy.signals import SignalHandlerOptions
 from rclpy.time import Time
 from tf2_ros import Buffer, TransformException, TransformListener
 
-from robot_dog_agent.robot import NavResult, turn_in_place
+from robot_dog_agent.robot import CANCELED, NavResult, turn_in_place
 from robot_dog_navigation.nav_eval import make_pose, sim_seconds, yaw_of
 
 PROGRESS_PERIOD = 2.0  # s of wall time between on_progress calls
@@ -26,8 +27,10 @@ class Nav2Robot:
 
     def __init__(self, timeout=120.0):
         # no rclpy SIGINT handler: Ctrl+C must reach go_to as KeyboardInterrupt instead of shutting rclpy down
-        rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
+        if not rclpy.ok():  # the window starts rclpy itself, for the camera
+            rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
         self.timeout = timeout
+        self._cancel = threading.Event()
         self.node = self._tf_node = self._listener = None
         try:
             self.node = BasicNavigator()
@@ -47,7 +50,15 @@ class Nav2Robot:
             self.close()  # else the TF thread keeps the process alive after the error
             raise
 
+    def cancel(self):
+        """From any thread: end the navigation under way, or the next one before it starts."""
+        self._cancel.set()
+
+    def clear_cancel(self):
+        self._cancel.clear()
+
     def pose(self, wait=POSE_WAIT):
+        """wait: wall seconds to wait for the transform; 0 = look once (safe from the UI thread)."""
         deadline = time.monotonic() + wait
         while True:
             try:
@@ -85,11 +96,18 @@ class Nav2Robot:
         """Send a task with send() -> accepted and wait for it to end; the NavResult counts sim time from t0."""
         nav = self.node
         nav.feedback = None  # BasicNavigator keeps the last task's feedback, which may be of another type
+        if self._cancel.is_set():  # canceled before it started (Stop while waiting for the model)
+            self._cancel.clear()
+            return NavResult('canceled', CANCELED, sim_seconds(nav) - t0)
         if not send():
             return NavResult('failed', 'Nav2 rejected the goal', sim_seconds(nav) - t0)
         last, ended = time.monotonic(), None
         try:
             while not nav.isTaskComplete():
+                if ended is None and self._cancel.is_set():
+                    self._cancel.clear()
+                    ended = ('canceled', CANCELED)
+                    nav.cancelTask()
                 if ended is None and sim_seconds(nav) - t0 > self.timeout:
                     ended = ('timeout', 'no arrival within %.0f s' % self.timeout)
                     nav.cancelTask()
@@ -99,7 +117,7 @@ class Nav2Robot:
                     if getattr(feedback, 'distance_remaining', None) is not None:
                         on_progress(feedback.distance_remaining)
         except KeyboardInterrupt:
-            ended = ('canceled', 'canceled by the user')
+            ended = ('canceled', CANCELED)
             nav.cancelTask()
             while not nav.isTaskComplete():
                 pass

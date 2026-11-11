@@ -108,3 +108,13 @@ def test_main_with_a_malformed_key_does_not_show_it(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert 'secret' not in out and 'GEMINI_API_KEY' in out
 
+
+
+# --- plan 6 ---
+
+def test_build_agent_hands_progress_to_a_callback():
+    said, seen = [], []
+    agent = chat.build_agent(FakeRobot(), 'k', 'm', say=said.append, on_progress=seen.append)
+    agent.toolbox.on_progress(1.234)
+    agent.toolbox.on_progress(0.0)
+    assert seen == [1.234, 0.0] and said == []

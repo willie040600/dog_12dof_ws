@@ -98,3 +98,34 @@ def test_turn_in_place_is_a_target_on_the_spot():
     assert turn_in_place((1.0, 2.0, 3.0), 1.0, 2.0, -3.0) == pytest.approx(2 * math.pi - 6.0)   # the short way round
     assert turn_in_place((1.0, 2.0, 0.0), 1.0, 2.0, 0.0) == 0.0
     assert turn_in_place((1.0, 2.0, 0.0), 1.2, 2.0, 1.0) is None                                # a walk, not a turn
+
+
+# --- plan 6: cancel from another thread ---
+
+def test_fake_robot_cancel_stops_the_next_navigation_once():
+    robot = FakeRobot()
+    robot.cancel()
+    assert robot.go_to(1.0, 0.0, 0.0) == NavResult('canceled', 'canceled by the user', 0.0)
+    assert robot.goals == [] and robot.pose() == (0.0, 0.0, 0.0)
+    assert robot.go_to(1.0, 0.0, 0.0).status == 'reached'            # one cancel, one navigation
+
+
+def test_fake_robot_clear_cancel():
+    robot = FakeRobot()
+    robot.cancel()
+    robot.clear_cancel()
+    assert robot.go_to(1.0, 0.0, 0.0).status == 'reached'
+
+
+def test_fake_robot_pose_takes_a_wait_and_close_is_recorded():
+    robot = FakeRobot((1.0, 2.0, 0.5))
+    assert robot.pose(wait=0) == (1.0, 2.0, 0.5) and robot.closed is False
+    robot.close()
+    assert robot.closed is True
+
+
+def test_a_canceled_navigation_is_reported_by_the_toolbox():
+    robot = FakeRobot()
+    robot.cancel()
+    r = box(robot).call('go_to_place', {'place': 'kitchen'})
+    assert r['status'] == 'canceled' and (r['x'], r['y']) == (0.0, 0.0)
