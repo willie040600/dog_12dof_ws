@@ -109,3 +109,17 @@ def test_conversation_is_reset_after_ctrl_c_in_a_tool():
     with pytest.raises(KeyboardInterrupt):
         Agent(llm, RecordingToolbox(error=KeyboardInterrupt())).ask('去廚房')
     assert llm.resets == 1
+
+
+def test_an_on_call_that_raises_ends_the_command_and_resets():
+    class Closing(BaseException):
+        pass
+
+    def on_call(call, result):
+        raise Closing()
+
+    llm = ScriptedLLM([Reply('', [KITCHEN, START])])
+    box = RecordingToolbox()
+    with pytest.raises(Closing):
+        Agent(llm, box, on_call=on_call).ask('先去廚房，再回起點')
+    assert box.calls == [('go_to_place', {'place': 'kitchen'})] and len(llm.sent) == 1 and llm.resets == 1

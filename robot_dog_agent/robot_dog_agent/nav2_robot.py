@@ -51,10 +51,11 @@ class Nav2Robot:
             raise
 
     def cancel(self):
-        """From any thread: end the navigation under way, or the next one before it starts."""
+        """From any thread: end the navigation under way and refuse every one after it, until clear_cancel()."""
         self._cancel.set()
 
     def clear_cancel(self):
+        """The robot may move again (the window calls this when the next command starts)."""
         self._cancel.clear()
 
     def pose(self, wait=POSE_WAIT):
@@ -96,8 +97,7 @@ class Nav2Robot:
         """Send a task with send() -> accepted and wait for it to end; the NavResult counts sim time from t0."""
         nav = self.node
         nav.feedback = None  # BasicNavigator keeps the last task's feedback, which may be of another type
-        if self._cancel.is_set():  # canceled before it started (Stop while waiting for the model)
-            self._cancel.clear()
+        if self._cancel.is_set():  # Stop came before this started: while waiting for the model, or a step ago
             return NavResult('canceled', CANCELED, sim_seconds(nav) - t0)
         if not send():
             return NavResult('failed', 'Nav2 rejected the goal', sim_seconds(nav) - t0)
@@ -105,7 +105,6 @@ class Nav2Robot:
         try:
             while not nav.isTaskComplete():
                 if ended is None and self._cancel.is_set():
-                    self._cancel.clear()
                     ended = ('canceled', CANCELED)
                     nav.cancelTask()
                 if ended is None and sim_seconds(nav) - t0 > self.timeout:

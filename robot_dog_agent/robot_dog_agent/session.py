@@ -22,6 +22,10 @@ STARTING_WAIT = 0.5  # s that shutdown waits for a start-up that is still under 
 STATUS = {'starting': '等 Nav2 啟動…', 'idle': '待命', 'busy': '處理中…', 'failed': '啟動失敗'}
 
 
+class Closing(BaseException):
+    """Raised into a running command once shutdown has begun, to end it without another round with the model."""
+
+
 def in_thread(fn):
     """Run fn in a daemon thread; the thread is the job (join, is_alive)."""
     thread = threading.Thread(target=fn, daemon=True)
@@ -44,6 +48,7 @@ class Session:
         self.on_event = lambda kind, text: None
         self.state, self.remaining, self.robot = 'starting', None, None  # remaining: m left of the navigation
         self._agent, self._job, self._run = None, None, run or in_thread
+        self._closing = False
 
     def _set_state(self, state):
         self.state = state
@@ -74,6 +79,8 @@ class Session:
 
     def _tool_done(self, call, result):
         self.remaining = None
+        if self._closing:  # the robot is stopped and refuses new goals; nobody will read the model's answer
+            raise Closing()
 
     def submit(self, text):
         """Start a command; False when there is nothing to send or the session is not idle."""
@@ -119,6 +126,7 @@ class Session:
     def shutdown(self, timeout=10.0):
         """Cancel, wait for the background job and close the robot. False when the job did not end in time
         (still waiting for Nav2): the robot is then left alone, and the caller should end the process."""
+        self._closing = True
         if self.robot is not None:
             self.robot.cancel()
         if self._job is not None:

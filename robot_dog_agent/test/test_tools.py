@@ -102,12 +102,14 @@ def test_turn_in_place_is_a_target_on_the_spot():
 
 # --- plan 6: cancel from another thread ---
 
-def test_fake_robot_cancel_stops_the_next_navigation_once():
+def test_fake_robot_cancel_holds_until_it_is_cleared():
     robot = FakeRobot()
     robot.cancel()
     assert robot.go_to(1.0, 0.0, 0.0) == NavResult('canceled', 'canceled by the user', 0.0)
+    assert robot.go_to(2.0, 0.0, 0.0).status == 'canceled'           # a model that tries the next step anyway
     assert robot.goals == [] and robot.pose() == (0.0, 0.0, 0.0)
-    assert robot.go_to(1.0, 0.0, 0.0).status == 'reached'            # one cancel, one navigation
+    robot.clear_cancel()
+    assert robot.go_to(1.0, 0.0, 0.0).status == 'reached'
 
 
 def test_fake_robot_clear_cancel():

@@ -4,9 +4,9 @@ A robot has
     pose() -> (x, y, yaw) in the map frame; raises RuntimeError when it is not known
     go_to(x, y, yaw, on_progress=None) -> NavResult; blocks until the navigation ends and calls
         on_progress(distance_remaining) now and then on the way
-    cancel(); from any thread: ends the navigation under way as 'canceled', or, when there is none, makes the
-        next go_to return 'canceled' without moving. One cancel ends one navigation.
-    clear_cancel(); forgets a cancel that has not been used
+    cancel(); from any thread: ends the navigation under way as 'canceled', and every go_to after it returns
+        'canceled' without moving, until clear_cancel(). It must hold: a model may ask for the next step anyway
+    clear_cancel(); the robot may move again (the start of the next command)
     close()
 nav2_robot.Nav2Robot is the real one.
 """
@@ -53,7 +53,6 @@ class FakeRobot:
 
     def go_to(self, x, y, yaw, on_progress=None):
         if self._cancel:
-            self._cancel = False
             return NavResult('canceled', CANCELED, 0.0)
         self.goals.append((x, y, yaw))
         self.progress_callbacks.append(on_progress)

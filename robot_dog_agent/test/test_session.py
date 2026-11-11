@@ -229,3 +229,47 @@ def test_shutdown_while_starting_does_not_wait_for_nav2():
     session.start(FakeRobot, lambda robot, **kw: FakeAgent())       # never runs: still "waiting for Nav2"
     assert session.state == 'starting'
     assert session.shutdown() is False and waited == [0.5]         # nothing to wait for: no goal was ever sent
+
+
+# --- final review: a Stop holds for the whole command ---
+
+def test_stop_holds_for_every_step_of_the_command():
+    robot, steps = CountingRobot(), []
+
+    def two_legs():                                  # a model that carries on after the first leg was canceled
+        session.stop()
+        steps.append(robot.go_to(2.5, -0.6, 0.0).status)
+        steps.append(robot.go_to(-2.0, -0.9, 0.0).status)
+        return '好'
+
+    session, _, _, _, _ = started([two_legs, lambda: robot.go_to(1.0, 0.0, 0.0).status], robot=robot)
+    session.submit('先去廚房，再去玄關')
+    assert steps == ['canceled', 'canceled'] and robot.goals == []
+    events = []
+    session.on_event = lambda kind, text: events.append((kind, text))
+    session.submit('往前')                            # the next command starts clean
+    assert ('reply', 'reached') in events
+
+
+def test_nothing_moves_after_shutdown():
+    session, _, robot, _, _ = started()
+    session.shutdown()
+    assert robot.go_to(1.0, 0.0, 0.0).status == 'canceled' and robot.goals == []
+
+
+def test_a_command_ends_at_its_next_tool_result_once_shutdown_has_begun():
+    # closing the window must not wait for the model to answer the canceled step (it may be slow or rate limited)
+    pending, asked_again = [], []
+    session, events, _, agent, callbacks = started(run=lambda fn: (pending.append(fn), StuckJob())[1])
+
+    def one_step():
+        callbacks['on_call'](None, {'status': 'canceled'})      # the navigation came back canceled
+        asked_again.append(True)                                 # ...and the agent would now go back to the model
+        return '好'
+
+    agent.answers = [one_step]
+    session.submit('去起點')
+    assert session.shutdown(timeout=0.01) is False              # the worker has not got that far yet
+    pending[0]()
+    assert asked_again == [] and not [e for e in events if e[0] == 'reply']
+    assert session.state == 'idle'

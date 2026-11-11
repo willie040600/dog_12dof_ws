@@ -191,7 +191,8 @@ def main(argv=None):
     app.exec_()
     window.close()  # no-op when the user closed it; needed when the event loop ended another way
     if not window.clean_shutdown:
-        # the start-up thread is still waiting for Nav2 and cannot be interrupted; no goal was ever sent
+        # a background thread would not end: the start-up still waiting for Nav2 (nothing was ever sent), or a
+        # command still waiting for the model (the robot refuses every goal after the cancel that shutdown set)
         os._exit(1)
     if feed is not None:
         feed.close()
