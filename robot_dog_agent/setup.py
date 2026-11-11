@@ -19,6 +19,7 @@ setup(
     entry_points={
         'console_scripts': [
             'chat = robot_dog_agent.chat:main',
+            'gui = robot_dog_agent.gui:main',
             'agent_eval = robot_dog_agent.agent_eval:main',
         ],
     },

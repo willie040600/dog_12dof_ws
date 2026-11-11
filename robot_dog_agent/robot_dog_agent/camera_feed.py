@@ -42,6 +42,10 @@ class CameraFeed:
             return self._frame
 
     def close(self):
-        self._executor.shutdown(timeout_sec=1.0)
-        self._thread.join(2.0)
-        self._node.destroy_node()
+        """Safe to call after rclpy has been shut down (the robot's close does that)."""
+        try:
+            self._executor.shutdown(timeout_sec=1.0)
+            self._thread.join(2.0)
+            self._node.destroy_node()
+        except Exception:
+            pass
