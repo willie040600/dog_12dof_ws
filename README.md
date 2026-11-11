@@ -99,6 +99,13 @@ ros2 run robot_dog_agent chat
 你> 先去廚房，再回起點
 ```
 
+也有視窗版，裡面看得到機器狗的相機畫面，還有地點按鈕和停止按鈕（Isaac Sim 不能加 `--no-camera`）：
+
+```bash
+cd ~/dog_12dof_ws && source install/setup.bash
+ros2 run robot_dog_agent gui
+```
+
 申請 key、能說的話、地點表和限制見 [robot_dog_agent/README.md](robot_dog_agent/README.md)。
 
 ## 確認裝好了

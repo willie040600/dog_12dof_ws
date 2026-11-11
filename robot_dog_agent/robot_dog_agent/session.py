@@ -18,6 +18,7 @@ NOT_LOCALIZED = 'Nav2 啟動了，但機器狗還沒有定位（%s）。請確�
 INTERNAL = '程式內部錯誤（%s），這一句沒有完成。'
 AREA_ZH = {'living, dining and kitchen area': '客餐廚', 'master bedroom': '主臥室', 'second bedroom': '次臥室',
            'bathroom': '浴室'}
+STARTING_WAIT = 0.5  # s that shutdown waits for a start-up that is still under way
 STATUS = {'starting': '等 Nav2 啟動…', 'idle': '待命', 'busy': '處理中…', 'failed': '啟動失敗'}
 
 
@@ -121,7 +122,8 @@ class Session:
         if self.robot is not None:
             self.robot.cancel()
         if self._job is not None:
-            self._job.join(timeout)
+            # while starting, the job waits for Nav2 and cannot be interrupted: do not make the user wait for it
+            self._job.join(STARTING_WAIT if self.state == 'starting' else timeout)
             if self._job.is_alive():
                 return False
         if self.robot is not None:

@@ -216,3 +216,16 @@ def test_the_default_runner_is_a_background_thread():
     assert session.submit('去廚房') is True
     session._job.join(5.0)
     assert not session._job.is_alive() and ('reply', '到了') in events and session.state == 'idle'
+
+
+def test_shutdown_while_starting_does_not_wait_for_nav2():
+    waited = []
+
+    class Waiting(StuckJob):
+        def join(self, timeout=None):
+            waited.append(timeout)
+
+    session = Session(run=lambda fn: Waiting())
+    session.start(FakeRobot, lambda robot, **kw: FakeAgent())       # never runs: still "waiting for Nav2"
+    assert session.state == 'starting'
+    assert session.shutdown() is False and waited == [0.5]         # nothing to wait for: no goal was ever sent
