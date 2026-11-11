@@ -93,14 +93,15 @@ robot_dog_agent/robot_dog_agent/
 
 ## 4. Session 與停止
 
-`Session(on_event, run=<開執行緒>)`：
-- `start(build)`：在背景執行 `build() -> (agent, robot)`。成功 → 狀態 `idle`；丟 `RuntimeError` → 事件 `error`、狀態 `failed`。
+`Session(run=<開執行緒>)`，事件送到它的 `on_event`：
+- `start(make_robot, make_agent)`：在背景建立機器人和 Agent。成功 → 狀態 `idle`；失敗 → 事件 `error`、狀態 `failed`。
 - `submit(text) -> bool`：空白、或狀態不是 `idle` 時回 `False`，什麼都不做。否則狀態 `busy`、送 `user` 事件、
   `robot.clear_cancel()`，在背景跑 `agent.ask(text)`，結束後送 `reply`（或 `error`）並回到 `idle`。
 - `stop()`：狀態是 `busy` 時呼叫 `robot.cancel()`。
-- `shutdown()`：`robot.cancel()`，等指令執行緒結束（最多 10 秒），`robot.close()`。
+- `shutdown()`：`robot.cancel()`，等背景工作結束（最多 10 秒），`robot.close()`。背景工作沒有在期限內結束時回 `False`
+  （例如還卡在等 Nav2）；這時 `main` 直接結束行程，因為沒有送出過目標，沒有東西要收。
 - `state`：`starting`、`idle`、`busy`、`failed`。`remaining`：導航中最近一次回報的剩餘距離，工具呼叫結束時清掉。
-- 事件 `on_event(kind, text)`，`kind` 是 `user`、`tool`、`reply`、`error`、`notice`（Gemini 重試提示）、`state`。
+- 事件 `on_event(kind, text)`，`kind` 是 `user`、`log`（工具呼叫那一行和 Gemini 重試的提示）、`reply`、`error`、`state`。
   錯誤的處理和 `run_chat` 相同：`GeminiError` 印訊息，其他例外只印類別名稱。
 
 機器人介面的取消：
@@ -125,7 +126,7 @@ robot_dog_agent/robot_dog_agent/
 - **robot**：`FakeRobot.cancel()` 後下一次 `go_to` 回 `canceled` 且沒有記錄目標；`clear_cancel()` 後恢復正常；
   取消只生效一次。
 - **session**（用同步的 `run`，不開執行緒）：空白和忙碌時 `submit` 回 `False`；就緒前不能送；事件順序
-  `state busy → user → tool → reply → state idle`；`GeminiError` 和其他例外都變成 `error` 事件並回到 `idle`；
+  `state busy → user → log → reply → state idle`；`GeminiError` 和其他例外都變成 `error` 事件並回到 `idle`；
   每個指令開始時清掉取消；`stop()` 只在 `busy` 時呼叫 `cancel()`；進度更新 `remaining`、工具結束時清掉；
   `start` 失敗 → `failed`；`shutdown` 取消並關閉機器人。
 - **gui**（Qt offscreen，假的 Session）：八個地點按鈕各送出對應的文字；Enter 和「送出」都會送出並清空；
