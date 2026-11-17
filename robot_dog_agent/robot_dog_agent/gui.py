@@ -16,6 +16,8 @@ from PyQt5.QtWidgets import (QApplication, QGridLayout, QHBoxLayout, QLabel, QLi
                              QPushButton, QSizePolicy, QVBoxLayout, QWidget)
 
 from robot_dog_agent import chat, places
+from robot_dog_agent.map_view import load_saved_map
+from robot_dog_agent.map_widget import MapWidget
 from robot_dog_agent.robot import FakeRobot
 from robot_dog_agent.session import Session, pose_text
 
@@ -23,22 +25,27 @@ NO_CAMERA = '沒有相機畫面（Isaac Sim 是不是加了 --no-camera？）'
 NO_ROBOT_CAMERA = '--no-robot：沒有相機'
 FRAME_PERIOD_MS, STATUS_PERIOD_MS = 100, 500
 STALE_AFTER = 3.0  # s; a frame older than this is no longer shown
+TARGET_HOLD = 2.0  # s the clicked target stays on the map after its command ended
 PREFIX = {'user': '你：', 'reply': '狗：', 'error': '[錯誤] ', 'log': ''}
 
 
 class MainWindow(QMainWindow):
     """session: a session.Session. latest_frame() -> (width, height, RGB bytes, arrival time by `clock`) or None;
-    None instead of a function when there is no camera. Everything here runs in the Qt main thread; other threads
-    reach it through the `events` signal only."""
+    None instead of a function when there is no camera. latest_map() -> (grid, resolution, origin, version) or None
+    and latest_path() -> ([(x, y), ...], arrival time by `clock`) or None (map_feed.MapFeed); None when absent.
+    Everything here runs in the Qt main thread; other threads reach it through the `events` signal only."""
 
     events = pyqtSignal(str, str)  # (kind, text) of Session.on_event
 
-    def __init__(self, session, latest_frame=None, no_camera_text=NO_CAMERA, clock=time.monotonic):
+    def __init__(self, session, latest_frame=None, no_camera_text=NO_CAMERA, clock=time.monotonic, latest_map=None,
+                 latest_path=None):
         super().__init__()
         self.session, self.latest_frame, self.no_camera_text, self.clock = session, latest_frame, no_camera_text, clock
+        self.latest_map, self.latest_path = latest_map, latest_path
         self.clean_shutdown, self._closed, self._shown_stamp = None, False, None
+        self._map_version, self._busy_since, self._target_until = None, None, None
         self.setWindowTitle('機器狗')
-        self.setMinimumSize(1000, 600)
+        self.setMinimumSize(1100, 700)
 
         self.image_label = QLabel(no_camera_text)
         self.image_label.setAlignment(Qt.AlignCenter)
@@ -59,6 +66,8 @@ class MainWindow(QMainWindow):
         self.stop_button.setStyleSheet('QPushButton:enabled { background: #c62828; color: white; font-weight: bold; }')
         self.stop_button.clicked.connect(lambda: self.session.stop())
 
+        self.map_widget = MapWidget()
+        self.map_widget.clicked.connect(self._go_to)
         self.log = QPlainTextEdit()
         self.log.setReadOnly(True)
         self.input = QLineEdit()
@@ -75,7 +84,8 @@ class MainWindow(QMainWindow):
         entry.addWidget(self.input, 1)
         entry.addWidget(self.send_button)
         right = QVBoxLayout()
-        right.addWidget(self.log, 1)
+        right.addWidget(self.map_widget, 3)
+        right.addWidget(self.log, 2)
         right.addLayout(entry)
         columns = QHBoxLayout()
         columns.addLayout(left, 3)
@@ -92,7 +102,8 @@ class MainWindow(QMainWindow):
         self._apply_state(session.state)
         self.refresh_status()
         self._timers = []
-        for period, slot in ((FRAME_PERIOD_MS, self.refresh_frame), (STATUS_PERIOD_MS, self.refresh_status)):
+        for period, slot in ((FRAME_PERIOD_MS, self.refresh_frame), (STATUS_PERIOD_MS, self.refresh_status),
+                             (STATUS_PERIOD_MS, self.refresh_map)):
             timer = QTimer(self)
             timer.timeout.connect(slot)
             timer.start(period)
@@ -102,8 +113,19 @@ class MainWindow(QMainWindow):
         if self.session.submit(self.input.text()):
             self.input.clear()
 
+    def _go_to(self, x, y):
+        if self.session.go_to(x, y):
+            self.map_widget.set_target((x, y))
+            self._target_until = None
+
     def _apply_state(self, state):
-        """idle: the user may type; busy: only Stop; starting / failed: nothing."""
+        """idle: the user may type or click the map; busy: only Stop; starting / failed: nothing."""
+        if state == 'busy':
+            self._busy_since = self.clock()
+        elif self._busy_since is not None:
+            self._busy_since = None
+            self._target_until = self.clock() + TARGET_HOLD
+        self.map_widget.set_clickable(state == 'idle')
         for widget in [self.input, self.send_button] + self.place_buttons:
             widget.setEnabled(state == 'idle')
         self.stop_button.setEnabled(state == 'busy')
@@ -139,6 +161,23 @@ class MainWindow(QMainWindow):
         if self.image_label.text() != self.no_camera_text:
             self.image_label.setText(self.no_camera_text)  # also drops the picture
 
+    def refresh_map(self):
+        """A new map when there is one, the dog, the path of the running command, and the clicked target."""
+        if self._closed:
+            return
+        latest = self.latest_map() if self.latest_map else None
+        if latest is not None and latest[3] != self._map_version:
+            self.map_widget.set_map(*latest[:3])
+            self._map_version = latest[3]
+        self.map_widget.set_pose(self.session.pose())
+        path = self.latest_path() if self.latest_path else None
+        # only a path planned for this command: the last one of the previous command stays the latest until then
+        fresh = self._busy_since is not None and path is not None and path[1] >= self._busy_since
+        self.map_widget.set_path(path[0] if fresh else [])
+        if self._busy_since is None and self._target_until is not None and self.clock() > self._target_until:
+            self.map_widget.set_target(None)
+            self._target_until = None
+
     def refresh_status(self):
         if self._closed:
             return
@@ -155,23 +194,29 @@ class MainWindow(QMainWindow):
 
 
 def create(args, api_key):
-    """(window, session, camera feed or None), wired up and starting. A QApplication must exist."""
-    session, feed = Session(), None
+    """(window, session, feeds to close at the end), wired up and starting. A QApplication must exist."""
+    session, feeds, latest_frame, latest_path = Session(), [], None, None
     if args.no_robot:
         make_robot, hint = FakeRobot, NO_ROBOT_CAMERA
+        saved = load_saved_map() + (1,)
+        latest_map = lambda: saved  # noqa: E731
     else:
         import rclpy  # only here: --no-robot needs no ROS
         from rclpy.signals import SignalHandlerOptions
 
         from robot_dog_agent.camera_feed import CameraFeed
+        from robot_dog_agent.map_feed import MapFeed
         from robot_dog_agent.nav2_robot import Nav2Robot
         if not rclpy.ok():
             rclpy.init(signal_handler_options=SignalHandlerOptions.NO)
-        feed, make_robot, hint = CameraFeed(), Nav2Robot, NO_CAMERA
-    window = MainWindow(session, latest_frame=feed.latest if feed else None, no_camera_text=hint)
+        camera, maps = CameraFeed(), MapFeed()
+        feeds, make_robot, hint = [camera, maps], Nav2Robot, NO_CAMERA
+        latest_frame, latest_map, latest_path = camera.latest, maps.latest_map, maps.latest_path
+    window = MainWindow(session, latest_frame=latest_frame, no_camera_text=hint, latest_map=latest_map,
+                        latest_path=latest_path)
     session.on_event = window.events.emit
     session.start(make_robot, lambda robot, **callbacks: chat.build_agent(robot, api_key, args.model, **callbacks))
-    return window, session, feed
+    return window, session, feeds
 
 
 def main(argv=None):
@@ -184,7 +229,7 @@ def main(argv=None):
         print(chat.BAD_KEY if os.environ.get('GEMINI_API_KEY', '').strip() else chat.NO_KEY)
         return 2
     app = QApplication.instance() or QApplication(sys.argv[:1])
-    window, session, feed = create(args, api_key)
+    window, session, feeds = create(args, api_key)
     # Ctrl+C in the terminal closes the window like its close button; the timers let Python run the handler
     signal.signal(signal.SIGINT, lambda *_: window.close())
     window.show()
@@ -194,7 +239,7 @@ def main(argv=None):
         # a background thread would not end: the start-up still waiting for Nav2 (nothing was ever sent), or a
         # command still waiting for the model (the robot refuses every goal after the cancel that shutdown set)
         os._exit(1)
-    if feed is not None:
+    for feed in feeds:
         feed.close()
     return 0
 
