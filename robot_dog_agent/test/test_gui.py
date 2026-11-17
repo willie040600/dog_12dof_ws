@@ -291,3 +291,33 @@ def test_no_map_function_keeps_the_hint():
     w, _ = window(MapSession())
     w.refresh_map()
     assert not w.map_widget.has_map
+
+
+# --- final review ---
+
+def test_an_old_target_is_cleared_when_the_next_command_starts():
+    now = [19.0]
+    w, session = window(MapSession(), latest_map=saved_map(), clock=lambda: now[0])
+    w.map_widget.clicked.emit(0.4, 2.7)                     # e.g. the bed: refused almost at once
+    w.on_event('state', 'busy')
+    w.on_event('state', 'idle')
+    now[0] = 20.0                                           # within the 2 s hold, a place button starts a command
+    w.on_event('state', 'busy')
+    w.refresh_map()
+    assert w.map_widget.target is None
+
+
+def test_a_new_map_click_keeps_its_own_target():
+    w, session = window(MapSession(), latest_map=saved_map())
+    w.map_widget.clicked.emit(0.4, 2.7)
+    w.on_event('state', 'busy')
+    w.on_event('state', 'idle')
+
+    def go_to(x, y):                                        # the real Session sends 'busy' inside go_to
+        session.went.append((x, y))
+        w.on_event('state', 'busy')
+        return True
+
+    session.go_to = go_to
+    w.map_widget.clicked.emit(2.6, 2.0)
+    assert w.map_widget.target == (2.6, 2.0)

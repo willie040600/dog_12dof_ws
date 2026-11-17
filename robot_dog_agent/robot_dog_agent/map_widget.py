@@ -69,8 +69,8 @@ class MapWidget(QWidget):
         if not self.clickable or view is None or event.button() != Qt.LeftButton:
             return
         point = view.to_world(event.x(), event.y())
-        if point is not None:
-            self.clicked.emit(*point)
+        if point is not None:  # to the centimetre: the map has 5 cm cells, and the coordinates are shown to the user
+            self.clicked.emit(round(point[0], 2), round(point[1], 2))
 
     def paintEvent(self, event):
         painter = QPainter(self)

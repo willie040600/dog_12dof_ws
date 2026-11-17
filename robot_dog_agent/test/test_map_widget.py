@@ -119,3 +119,12 @@ def test_everything_drawn():
     assert not picture.isNull()
     px, py = w.view.to_pixel(0.0, 0.0)
     assert picture.pixelColor(round(px), round(py)).blue() > 150   # the dog is blue
+
+
+def test_clicks_are_rounded_to_a_centimetre():
+    w = widget()
+    spy = QSignalSpy(w.clicked)
+    w.set_clickable(True)
+    QTest.mouseClick(w, Qt.LeftButton, Qt.NoModifier, QPoint(301, 151))
+    x, y = spy[0]
+    assert (x, y) == (round(x, 2), round(y, 2))

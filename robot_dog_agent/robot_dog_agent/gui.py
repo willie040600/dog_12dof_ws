@@ -122,6 +122,9 @@ class MainWindow(QMainWindow):
         """idle: the user may type or click the map; busy: only Stop; starting / failed: nothing."""
         if state == 'busy':
             self._busy_since = self.clock()
+            if self._target_until is not None:  # the last command's target: not where this one goes
+                self.map_widget.set_target(None)
+                self._target_until = None
         elif self._busy_since is not None:
             self._busy_since = None
             self._target_until = self.clock() + TARGET_HOLD
