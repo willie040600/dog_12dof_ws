@@ -6,7 +6,6 @@ at once: no ROS, for trying the conversation). Ctrl+C during a navigation cancel
 """
 import argparse
 import functools
-import json
 import os
 import sys
 
@@ -38,9 +37,7 @@ def build_agent(robot, api_key, model, say=print, on_call=None, on_progress=None
     on_progress(distance) takes the progress instead of say (the window shows it in its status bar).
     """
     def show_call(call, result):
-        reason = '（%s）' % result['reason'] if result.get('reason') else ''
-        say('  [工具] %s %s → %s%s' % (call.name, json.dumps(call.args, ensure_ascii=False), result.get('status'),
-                                      reason))
+        say(tools.tool_line(call.name, call.args, result))
         if on_call:
             on_call(call, result)
 

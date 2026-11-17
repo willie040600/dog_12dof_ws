@@ -273,3 +273,68 @@ def test_a_command_ends_at_its_next_tool_result_once_shutdown_has_begun():
     pending[0]()
     assert asked_again == [] and not [e for e in events if e[0] == 'reply']
     assert session.state == 'idle'
+
+
+# --- plan 7: a click on the map ---
+
+from robot_dog_agent import places  # noqa: E402
+from robot_dog_agent.session import MAP_LINE  # noqa: E402
+from robot_dog_agent.tools import Toolbox  # noqa: E402
+
+TRUTH = places.load_body_truth()
+
+
+def with_toolbox(**kw):
+    session, events, robot, agent, callbacks = started(**kw)
+    agent.toolbox = Toolbox(robot, TRUTH)
+    return session, events, robot, agent
+
+
+def test_go_to_runs_the_tool_without_the_model():
+    session, events, robot, agent = with_toolbox()
+    assert session.go_to(1.0, 0.0) is True
+    assert agent.asked == [] and robot.goals[0][:2] == (1.0, 0.0)
+    assert events == [('state', 'busy'), ('log', MAP_LINE % (1.0, 0.0)),
+                      ('log', '  [工具] go_to_pose {"x": 1.0, "y": 0.0} → reached'), ('state', 'idle')]
+    assert MAP_LINE % (1.0, 0.0) == '[地圖] 去 (1.00, 0.00)'
+
+
+def test_go_to_a_blocked_point():
+    session, events, robot, _ = with_toolbox()
+    session.go_to(0.4, 2.7)
+    assert events[2][1].startswith('  [工具] go_to_pose {"x": 0.4, "y": 2.7} → blocked（not connected')
+    assert robot.goals == [] and session.state == 'idle'
+
+
+def test_go_to_is_refused_unless_idle():
+    assert Session(run=sync).go_to(1.0, 0.0) is False
+    pending = []
+    session, _, _, _ = with_toolbox(run=lambda fn: (pending.append(fn), DoneJob())[1])
+    assert session.go_to(1.0, 0.0) is True and session.go_to(2.0, 0.0) is False
+    assert session.submit('去廚房') is False
+
+
+def test_go_to_stop_and_shutdown():
+    pending = []
+    session, events, robot, _ = with_toolbox(run=lambda fn: (pending.append(fn), DoneJob())[1])
+    session.go_to(1.0, 0.0)
+    session.stop()
+    assert robot.cancels == 1
+    pending.pop()()
+    assert events[-2][1].endswith('→ canceled（canceled by the user）') and robot.goals == []
+    session.go_to(1.0, 0.0)                    # a new command starts clean
+    assert session.shutdown() is True and robot.closed
+    pending.pop()()                            # its tool result comes back after the shutdown began
+    assert not [e for e in events if e[0] == 'error'] and session.state == 'idle' and robot.goals == []
+
+
+def test_go_to_errors_become_error_events():
+    session, events, _, agent = with_toolbox()
+
+    class Broken:
+        def call(self, name, args):
+            raise ValueError('x')
+
+    agent.toolbox = Broken()
+    session.go_to(1.0, 0.0)
+    assert events[-2:] == [('error', INTERNAL % 'ValueError'), ('state', 'idle')]

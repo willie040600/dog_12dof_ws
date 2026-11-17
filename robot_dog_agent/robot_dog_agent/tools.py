@@ -1,4 +1,5 @@
 """The tools the model can call and what it is told about them (spec 2026-11-10, 5.1). Plain Python."""
+import json
 import math
 
 from robot_dog_agent import places
@@ -51,6 +52,12 @@ Rules:
 
 def system_instruction():
     return INSTRUCTION % '\n'.join('- %s: %s, (%s, %s)' % (p.id, p.name, p.x, p.y) for p in places.PLACES)
+
+
+def tool_line(name, args, result):
+    """How a tool call and its result are shown to the user (terminal chat and window alike)."""
+    reason = '（%s）' % result['reason'] if result.get('reason') else ''
+    return '  [工具] %s %s → %s%s' % (name, json.dumps(args, ensure_ascii=False), result.get('status'), reason)
 
 
 class BadArguments(Exception):

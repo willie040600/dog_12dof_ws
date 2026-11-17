@@ -131,3 +131,12 @@ def test_a_canceled_navigation_is_reported_by_the_toolbox():
     robot.cancel()
     r = box(robot).call('go_to_place', {'place': 'kitchen'})
     assert r['status'] == 'canceled' and (r['x'], r['y']) == (0.0, 0.0)
+
+
+# --- plan 7 ---
+
+def test_tool_line():
+    assert tools.tool_line('go_to_pose', {'x': 1.2, 'y': 0.5}, {'status': 'reached'}) == \
+        '  [工具] go_to_pose {"x": 1.2, "y": 0.5} → reached'
+    assert tools.tool_line('go_to_place', {'place': 'kitchen'}, {'status': 'blocked', 'reason': 'on an obstacle'}) == \
+        '  [工具] go_to_place {"place": "kitchen"} → blocked（on an obstacle）'

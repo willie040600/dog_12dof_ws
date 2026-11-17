@@ -12,10 +12,12 @@ import math
 import threading
 
 from robot_dog_agent import places
+from robot_dog_agent.tools import tool_line
 
 READY = '可以開始了：打字、或按下面的地點按鈕。'
 NOT_LOCALIZED = 'Nav2 啟動了，但機器狗還沒有定位（%s）。請確認 nav.launch.py 正常執行。'
 INTERNAL = '程式內部錯誤（%s），這一句沒有完成。'
+MAP_LINE = '[地圖] 去 (%.2f, %.2f)'
 AREA_ZH = {'living, dining and kitchen area': '客餐廚', 'master bedroom': '主臥室', 'second bedroom': '次臥室',
            'bathroom': '浴室'}
 STARTING_WAIT = 0.5  # s that shutdown waits for a start-up that is still under way
@@ -98,6 +100,28 @@ class Session:
             except BaseException as e:
                 gemini = type(e).__name__ == 'GeminiError'  # its message is written for the user
                 kind, out = 'error', str(e) if gemini else INTERNAL % type(e).__name__
+            self.remaining = None
+            self.on_event(kind, out)
+            self._set_state('idle')
+        self._job = self._run(job)
+        return True
+
+    def go_to(self, x, y):
+        """Send the dog to map point (x, y) clicked on the map: the go_to_pose tool, without the model.
+        False when the session is not idle."""
+        if self.state != 'idle':
+            return False
+        self.remaining = None
+        self._set_state('busy')
+        self.robot.clear_cancel()
+        args = {'x': x, 'y': y}
+        self.on_event('log', MAP_LINE % (x, y))
+
+        def job():
+            try:
+                kind, out = 'log', tool_line('go_to_pose', args, self._agent.toolbox.call('go_to_pose', args))
+            except BaseException as e:
+                kind, out = 'error', INTERNAL % type(e).__name__
             self.remaining = None
             self.on_event(kind, out)
             self._set_state('idle')
