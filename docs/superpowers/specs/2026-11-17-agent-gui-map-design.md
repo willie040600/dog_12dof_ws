@@ -60,7 +60,7 @@
 | 地點 | 八個小圓點，旁邊是地點的短名稱（「廚房」） | `places.PLACES` |
 | 狗 | 藍色三角形，尖端指向朝向 | 和狀態列同一個位置（`session.pose()`，每 0.5 秒） |
 | 路徑 | 綠色折線 | Nav2 的 `/plan`；只在「處理中」時畫，指令結束就清掉 |
-| 點選的目標 | 紅色 ✕ | 點下去的位置；指令結束時清掉；被拒絕時顯示 2 秒 |
+| 點選的目標 | 紅色 ✕ | 點下去的位置；指令結束（到達、被拒絕、取消）後再保留 2 秒才清掉 |
 
 還沒收到地圖時，地圖區顯示「等地圖…（nav.launch.py 開了嗎？）」。`--no-robot` 時改讀 repo 裡的 `maps/apartment.yaml`。
 
@@ -82,7 +82,8 @@
 |---|---|
 | `map_view.py`（新，純 Python + numpy） | `grid_to_gray(data, width, height)`：佔據格（-1/0～100）轉成灰階位元組，並上下翻轉讓 y 朝上；`MapGeometry(resolution, origin, width, height)`：地圖座標 ↔ 格子座標，以及給定元件大小時的縮放與置中（地圖座標 ↔ 畫面像素） |
 | `map_feed.py`（新，rclpy） | `MapFeed`：自己的節點和執行緒，訂閱 `/map`（transient local，才拿得到啟動前就發布的地圖）和 `/plan`；`latest_map()`、`latest_path()` 只回最新一份 |
-| `gui.py` | 新增 `MapWidget`（自己畫：地圖、地點、路徑、狗、目標；處理點擊）；版面改成右欄上下兩塊；計時器每 0.5 秒更新狗和路徑，地圖只在換新時重畫 |
+| `map_widget.py`（新，PyQt5） | `MapWidget`：自己畫地圖、地點、路徑、狗、目標；處理點擊 |
+| `gui.py` | 版面改成右欄上下兩塊；計時器每 0.5 秒更新狗和路徑，地圖只在換新時重畫；路徑只畫這個指令開始之後才收到的 |
 | `session.py` | 新增 `go_to(x, y) -> bool`：和 `submit` 相同的狀態與事件，但直接呼叫 `toolbox.call('go_to_pose', …)` |
 
 依賴不變：`/map`、`/plan` 的訊息型別（`nav_msgs`）已在 `package.xml`。不安裝新套件。
