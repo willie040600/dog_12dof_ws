@@ -44,3 +44,19 @@ def test_area_and_nearest():
     assert places.area_of(5.0, -1.0) == 'bathroom'
     place, dist = places.nearest_place(2.4, -0.6)
     assert place.id == 'kitchen' and abs(dist - 0.1) < 1e-9
+
+
+def test_stand_near_the_sofa():
+    x, y, yaw = places.stand_near(TRUTH, (0.0, -0.75), (0.0, 0.0))     # the sofa's front, seen from the start
+    d = math.hypot(x - 0.0, y + 0.75)
+    assert 0.5 - 1e-9 <= d <= 1.0 + 1e-9 and places.check_target(TRUTH, x, y) is None
+    assert abs(places.wrap(yaw - math.atan2(-0.75 - y, 0.0 - x))) < 1e-9
+
+
+def test_stand_near_picks_the_side_nearest_the_robot():
+    x, _, _ = places.stand_near(TRUTH, (0.0, -0.75), (1.5, -0.3))
+    assert x > 0
+
+
+def test_stand_near_nowhere():
+    assert places.stand_near(TRUTH, (20.0, 0.0), (0.0, 0.0)) is None

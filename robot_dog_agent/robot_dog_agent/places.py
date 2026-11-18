@@ -80,3 +80,25 @@ def nearest_place(x, y):
     """(place, distance in m) of the named place closest to (x, y)."""
     place = min(PLACES, key=lambda p: math.hypot(p.x - x, p.y - y))
     return place, math.hypot(place.x - x, place.y - y)
+
+
+STAND_RADII = (0.5, 0.6, 0.7, 0.8, 0.9, 1.0)  # m from the thing
+STAND_ANGLES = 24                             # candidates per radius
+
+
+def stand_near(truth, target, robot_xy):
+    """(x, y, yaw) to stop at near the point target, facing it: the reachable candidate nearest the robot, or None."""
+    best = None
+    for radius in STAND_RADII:
+        for k in range(STAND_ANGLES):
+            a = 2.0 * math.pi * k / STAND_ANGLES
+            x, y = target[0] + radius * math.cos(a), target[1] + radius * math.sin(a)
+            if check_target(truth, x, y) is not None:
+                continue
+            d = math.hypot(x - robot_xy[0], y - robot_xy[1])
+            if best is None or d < best[0]:
+                best = (d, x, y)
+    if best is None:
+        return None
+    _, x, y = best
+    return x, y, math.atan2(target[1] - y, target[0] - x)
