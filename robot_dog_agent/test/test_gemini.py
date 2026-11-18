@@ -191,3 +191,37 @@ def test_a_200_that_is_not_json_is_an_error():
     c, _, _, _ = client([Response(200, text='<html>proxy login</html>')])
     with pytest.raises(GeminiError, match='看不懂'):
         c.send(text='哈囉')
+
+
+# --- plan 8: one picture outside the conversation ---
+
+import base64  # noqa: E402
+
+JPEG = b'\xff\xd8fake jpeg'
+
+
+def test_ask_image_request_shape():
+    c, post, _, _ = client([recorded('text')])
+    answer = c.ask_image('找沙發', JPEG)
+    assert answer == gemini.parse_reply(load('text')['body'])[1].text and answer.strip()
+    assert post.calls[0]['json'] == {'model': MODEL, 'input': [
+        {'type': 'text', 'text': '找沙發'},
+        {'type': 'image', 'data': base64.b64encode(JPEG).decode('ascii'), 'mime_type': 'image/jpeg'}]}
+
+
+def test_ask_image_leaves_the_conversation_alone():
+    c, post, _, _ = client([recorded('call'), recorded('text'), recorded('after_result')])
+    reply = c.send(text='去廚房')
+    c.ask_image('找沙發', JPEG)
+    c.send(results=[(reply.calls[0], {'status': 'reached'})])
+    assert 'previous_interaction_id' not in post.calls[1]['json']
+    assert post.calls[2]['json']['previous_interaction_id'] == load('call')['body']['id']
+
+
+def test_ask_image_retries_and_errors_like_send():
+    c, _, sleeps, _ = client([Response(429, {'error': {'message': 'quota'}}), recorded('text')])
+    assert c.ask_image('找沙發', JPEG).strip() and sleeps == [10]
+    c, _, _, _ = client([recorded('error_key')], key='secret-key')
+    with pytest.raises(GeminiError) as e:
+        c.ask_image('找沙發', JPEG)
+    assert 'secret-key' not in str(e.value)

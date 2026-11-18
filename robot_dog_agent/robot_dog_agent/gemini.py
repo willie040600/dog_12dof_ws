@@ -3,6 +3,7 @@
 Plain REST with requests: one endpoint, and the system Python that ROS uses cannot pip-install the SDK.
 The request and reply shapes are the ones recorded from the real API in test/data/.
 """
+import base64
 import json
 import time
 
@@ -84,19 +85,33 @@ class GeminiClient:
             self.say('之前的對話已過期，重新開始')
             self.previous_id = None
             response = self._post(text, results, None)
+        self.previous_id, reply = self._reply(response)
+        return reply
+
+    def ask_image(self, prompt, jpeg):
+        """The model's text answer about one JPEG picture, outside the conversation (which it leaves as it is)."""
+        image = {'type': 'image', 'data': base64.b64encode(jpeg).decode('ascii'), 'mime_type': 'image/jpeg'}
+        request = {'model': self.model, 'input': [{'type': 'text', 'text': prompt}, image]}
+        return self._reply(self._post_request(request))[1].text
+
+    @staticmethod
+    def _reply(response):
+        """(interaction id, Reply) of a final response, or GeminiError."""
         if response.status_code != 200:
             message = error_message(response)
             hint = 'API key 無效，請檢查 GEMINI_API_KEY。' if 'API key' in message else ''
             raise GeminiError('%sGemini 拒絕了請求（HTTP %d）：%s' % (hint, response.status_code, message))
         try:
-            self.previous_id, reply = parse_reply(response.json())
+            return parse_reply(response.json())
         except (ValueError, AttributeError, TypeError):
             raise GeminiError('看不懂 Gemini 的回應（HTTP 200，但不是預期的格式）') from None
-        return reply
 
     def _post(self, text, results, previous_id):
+        return self._post_request(build_request(self.model, self.system_instruction, self.tools, text, results,
+                                                previous_id))
+
+    def _post_request(self, request):
         """One request, retried while the server is busy or out of reach. Returns the last response."""
-        request = build_request(self.model, self.system_instruction, self.tools, text, results, previous_id)
         headers = {'x-goog-api-key': self.api_key, 'Content-Type': 'application/json'}
         for wait in self.RETRY_WAITS + (None,):
             try:
