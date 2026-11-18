@@ -321,3 +321,41 @@ def test_a_new_map_click_keeps_its_own_target():
     session.go_to = go_to
     w.map_widget.clicked.emit(2.6, 2.0)
     assert w.map_widget.target == (2.6, 2.0)
+
+
+# --- plan 8: the survey button and remembered things ---
+
+class SurveySession(MapSession):
+    def __init__(self, state='idle'):
+        super().__init__(state)
+        self.surveyed = 0
+
+    def survey(self):
+        self.surveyed += 1
+        return True
+
+
+def test_the_survey_button_calls_survey():
+    w, session = window(SurveySession(), can_survey=True)
+    w.survey_button.click()
+    assert session.surveyed == 1
+
+
+def test_the_survey_button_follows_the_state():
+    w, _ = window(SurveySession(), can_survey=True)
+    seen = {}
+    for state in ('idle', 'busy', 'starting', 'failed'):
+        w.on_event('state', state)
+        seen[state] = w.survey_button.isEnabled()
+    assert seen == {'idle': True, 'busy': False, 'starting': False, 'failed': False}
+
+
+def test_no_survey_button_without_eyes():
+    w, _ = window(SurveySession())
+    assert w.survey_button is None
+
+
+def test_remembered_objects_on_the_map():
+    w, _ = window(MapSession(), latest_map=saved_map(), objects=lambda: [('沙發', 0.0, -0.75)])
+    w.refresh_map()
+    assert w.map_widget.objects == [('沙發', 0.0, -0.75)]

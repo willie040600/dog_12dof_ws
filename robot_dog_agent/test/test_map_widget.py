@@ -128,3 +128,13 @@ def test_clicks_are_rounded_to_a_centimetre():
     QTest.mouseClick(w, Qt.LeftButton, Qt.NoModifier, QPoint(301, 151))
     x, y = spy[0]
     assert (x, y) == (round(x, 2), round(y, 2))
+
+
+def test_objects_are_drawn():
+    w = widget()
+    w.set_objects([('沙發', 0.0, -0.75)])
+    assert w.objects == [('沙發', 0.0, -0.75)]
+    picture = w.grab().toImage()
+    px, py = w.view.to_pixel(0.0, -0.75)
+    colour = picture.pixelColor(round(px), round(py))
+    assert colour.red() > 200 and colour.blue() < 100            # orange

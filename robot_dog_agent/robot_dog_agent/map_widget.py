@@ -13,6 +13,7 @@ from robot_dog_agent.map_view import MapView, grid_to_gray
 
 NO_MAP = '等地圖…（nav.launch.py 開了嗎？）'
 DOG, PATH, TARGET, PLACE = QColor('#1565c0'), QColor('#2e7d32'), QColor('#d32f2f'), QColor('#6d4c41')
+THING = QColor('#ef6c00')  # a remembered thing (orange)
 DOG_SIZE = 0.35  # m from the dog's centre to the tip of its triangle
 
 
@@ -24,7 +25,7 @@ class MapWidget(QWidget):
         self.setMinimumSize(300, 180)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._image, self._map = None, None  # QImage of the map; (resolution, origin, width, height)
-        self.pose, self.path, self.target, self.clickable = None, [], None, False
+        self.pose, self.path, self.target, self.clickable, self.objects = None, [], None, False, []
 
     @property
     def has_map(self):
@@ -53,6 +54,13 @@ class MapWidget(QWidget):
         points = list(points)
         if points != self.path:
             self.path = points
+            self.update()
+
+    def set_objects(self, objects):
+        """[(name, x, y), ...] of the remembered things."""
+        objects = list(objects)
+        if objects != self.objects:
+            self.objects = objects
             self.update()
 
     def set_target(self, target):
@@ -92,6 +100,14 @@ class MapWidget(QWidget):
             painter.drawEllipse(QPointF(px, py), 3.5, 3.5)
             painter.setPen(PLACE)
             painter.drawText(QPointF(px + 5, py - 4), place.name.split('（')[0])
+
+        for name, x, y in self.objects:
+            px, py = view.to_pixel(x, y)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(THING)
+            painter.drawRect(QRectF(px - 4.5, py - 4.5, 9, 9))
+            painter.setPen(THING)
+            painter.drawText(QPointF(px + 6, py + 12), name)
 
         if len(self.path) >= 2:
             painter.setPen(QPen(PATH, 2.5))

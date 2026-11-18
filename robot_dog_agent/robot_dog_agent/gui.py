@@ -1,6 +1,6 @@
 """The chat with the robot dog as a window, with its camera image (spec 2026-11-11).
 
-    ros2 run robot_dog_agent gui [--model gemini-3.5-flash-lite] [--no-robot]
+    ros2 run robot_dog_agent gui [--model gemini-3.5-flash-lite] [--vision-model gemini-3.5-flash-lite] [--no-robot]
 Needs GEMINI_API_KEY, and Isaac Sim (with its camera: no --no-camera) and nav.launch.py running unless --no-robot.
 The same agent as the terminal chat; Stop cancels a navigation, closing the window ends everything.
 """
@@ -16,6 +16,9 @@ from PyQt5.QtWidgets import (QApplication, QGridLayout, QHBoxLayout, QLabel, QLi
                              QPushButton, QSizePolicy, QVBoxLayout, QWidget)
 
 from robot_dog_agent import chat, places
+from robot_dog_agent.eyes import Eyes
+from robot_dog_agent.gemini import GeminiClient
+from robot_dog_agent.objects import ObjectMemory
 from robot_dog_agent.map_view import load_saved_map
 from robot_dog_agent.map_widget import MapWidget
 from robot_dog_agent.robot import FakeRobot
@@ -38,10 +41,10 @@ class MainWindow(QMainWindow):
     events = pyqtSignal(str, str)  # (kind, text) of Session.on_event
 
     def __init__(self, session, latest_frame=None, no_camera_text=NO_CAMERA, clock=time.monotonic, latest_map=None,
-                 latest_path=None):
+                 latest_path=None, objects=None, can_survey=False):
         super().__init__()
         self.session, self.latest_frame, self.no_camera_text, self.clock = session, latest_frame, no_camera_text, clock
-        self.latest_map, self.latest_path = latest_map, latest_path
+        self.latest_map, self.latest_path, self.objects = latest_map, latest_path, objects  # objects() -> [(name, x, y)]
         self.clean_shutdown, self._closed, self._shown_stamp = None, False, None
         self._map_version, self._busy_since, self._target_until = None, None, None
         self.setWindowTitle('機器狗')
@@ -61,6 +64,11 @@ class MainWindow(QMainWindow):
             button.clicked.connect(lambda _checked=False, name=name: self.session.submit('去' + name))
             self.place_buttons.append(button)
             grid.addWidget(button, i // 4, i % 4)
+        self.survey_button = None
+        if can_survey:  # only a robot with eyes can remember what it sees
+            self.survey_button = QPushButton('巡邏（記住看到的東西）')
+            self.survey_button.clicked.connect(lambda: self.session.survey())
+            grid.addWidget(self.survey_button, 2, 0, 1, 4)
         self.stop_button = QPushButton('停 止')
         self.stop_button.setMinimumHeight(40)
         self.stop_button.setStyleSheet('QPushButton:enabled { background: #c62828; color: white; font-weight: bold; }')
@@ -129,7 +137,7 @@ class MainWindow(QMainWindow):
             self._busy_since = None
             self._target_until = self.clock() + TARGET_HOLD
         self.map_widget.set_clickable(state == 'idle')
-        for widget in [self.input, self.send_button] + self.place_buttons:
+        for widget in [self.input, self.send_button] + self.place_buttons + [b for b in [self.survey_button] if b]:
             widget.setEnabled(state == 'idle')
         self.stop_button.setEnabled(state == 'busy')
         if state == 'idle':
@@ -173,6 +181,8 @@ class MainWindow(QMainWindow):
             self.map_widget.set_map(*latest[:3])
             self._map_version = latest[3]
         self.map_widget.set_pose(self.session.pose())
+        if self.objects:
+            self.map_widget.set_objects(self.objects())
         path = self.latest_path() if self.latest_path else None
         # only a path planned for this command: the last one of the previous command stays the latest until then
         fresh = self._busy_since is not None and path is not None and path[1] >= self._busy_since
@@ -198,7 +208,7 @@ class MainWindow(QMainWindow):
 
 def create(args, api_key):
     """(window, session, feeds to close at the end), wired up and starting. A QApplication must exist."""
-    session, feeds, latest_frame, latest_path = Session(), [], None, None
+    session, feeds, latest_frame, latest_path, memory, make_eyes = Session(), [], None, None, None, None
     if args.no_robot:
         make_robot, hint = FakeRobot, NO_ROBOT_CAMERA
         saved = load_saved_map() + (1,)
@@ -215,16 +225,23 @@ def create(args, api_key):
         camera, maps = CameraFeed(), MapFeed()
         feeds, make_robot, hint = [camera, maps], Nav2Robot, NO_CAMERA
         latest_frame, latest_map, latest_path = camera.latest, maps.latest_map, maps.latest_path
+        memory = ObjectMemory()
+        vision = GeminiClient(api_key, getattr(args, 'vision_model', chat.VISION_MODEL), '', [],
+                              say=lambda text: session.on_event('log', text))
+        make_eyes = lambda robot: Eyes(lambda: camera.snapshot(robot.tf_buffer), vision.ask_image, memory)  # noqa: E731
     window = MainWindow(session, latest_frame=latest_frame, no_camera_text=hint, latest_map=latest_map,
-                        latest_path=latest_path)
+                        latest_path=latest_path, objects=memory and (lambda: [(i.name, i.x, i.y) for i in memory.items]),
+                        can_survey=memory is not None)
     session.on_event = window.events.emit
-    session.start(make_robot, lambda robot, **callbacks: chat.build_agent(robot, api_key, args.model, **callbacks))
+    session.start(make_robot, lambda robot, **callbacks: chat.build_agent(
+        robot, api_key, args.model, eyes=make_eyes(robot) if make_eyes else None, **callbacks))
     return window, session, feeds
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.split('\n')[0])
     parser.add_argument('--model', default=chat.DEFAULT_MODEL, help='Gemini model id')
+    parser.add_argument('--vision-model', default=chat.VISION_MODEL, help='Gemini model id for the camera pictures')
     parser.add_argument('--no-robot', action='store_true', help='a stand-in robot: no ROS, no simulator, no camera')
     args, _ = parser.parse_known_args(argv)
     api_key = chat.usable_key(os.environ.get('GEMINI_API_KEY'))
