@@ -338,3 +338,40 @@ def test_go_to_errors_become_error_events():
     agent.toolbox = Broken()
     session.go_to(1.0, 0.0)
     assert events[-2:] == [('error', INTERNAL % 'ValueError'), ('state', 'idle')]
+
+
+# --- plan 8: survey and progress notes ---
+
+def test_survey_runs_the_tool_and_shows_progress():
+    pending = []
+    session, events, robot, agent = with_toolbox(run=lambda fn: (pending.append(fn), DoneJob())[1])
+
+    class SurveyBox:
+        def call(self, name, args):
+            session._note('巡邏中 3/8')
+            assert session.status_text() == '巡邏中 3/8'
+            return {'status': 'ok', 'remembered': 5}
+
+    agent.toolbox = SurveyBox()
+    assert session.survey() is True and session.state == 'busy'
+    pending.pop()()
+    assert ('log', '[巡邏] 開始') in events and events[-2] == ('log', '  [工具] survey {} → ok')
+    assert session.state == 'idle' and session.note is None
+
+
+def test_note_and_distance_together():
+    session, _, _, _, callbacks = started(run=lambda fn: DoneJob())
+    session.submit('巡邏一圈')
+    callbacks['on_note']('巡邏中 2/8')
+    callbacks['on_progress'](1.23)
+    assert session.status_text() == '巡邏中 2/8，剩 1.2 m'
+
+
+def test_note_is_cleared_after_the_command():
+    session, _, _, _, callbacks = started([lambda: callbacks['on_note']('巡邏中 1/8') or '好'])
+    session.submit('巡邏一圈')
+    assert session.note is None and session.status_text() == '待命'
+
+
+def test_survey_is_refused_unless_idle():
+    assert Session(run=sync).survey() is False

@@ -18,6 +18,7 @@ READY = '可以開始了：打字、或按下面的地點按鈕。'
 NOT_LOCALIZED = 'Nav2 啟動了，但機器狗還沒有定位（%s）。請確認 nav.launch.py 正常執行。'
 INTERNAL = '程式內部錯誤（%s），這一句沒有完成。'
 MAP_LINE = '[地圖] 去 (%.2f, %.2f)'
+SURVEY_LINE = '[巡邏] 開始'
 AREA_ZH = {'living, dining and kitchen area': '客餐廚', 'master bedroom': '主臥室', 'second bedroom': '次臥室',
            'bathroom': '浴室'}
 STARTING_WAIT = 0.5  # s that shutdown waits for a start-up that is still under way
@@ -49,6 +50,7 @@ class Session:
     def __init__(self, run=None):
         self.on_event = lambda kind, text: None
         self.state, self.remaining, self.robot = 'starting', None, None  # remaining: m left of the navigation
+        self.note = None  # what a long tool is doing (巡邏中 3/8), while busy
         self._agent, self._job, self._run = None, None, run or in_thread
         self._closing = False
 
@@ -59,13 +61,13 @@ class Session:
     def start(self, make_robot, make_agent):
         """Build the robot (may block until Nav2 is up) and the agent in the background, then become idle.
 
-        make_agent(robot, say=, on_call=, on_progress=) -> agent, the keywords of chat.build_agent.
+        make_agent(robot, say=, on_call=, on_progress=, on_note=) -> agent, the keywords of chat.build_agent.
         """
         def job():
             try:
                 self.robot = make_robot()
                 self._agent = make_agent(self.robot, say=lambda text: self.on_event('log', text),
-                                         on_call=self._tool_done, on_progress=self._progress)
+                                         on_call=self._tool_done, on_progress=self._progress, on_note=self._note)
             except RuntimeError as e:
                 self.on_event('error', NOT_LOCALIZED % e)
                 return self._set_state('failed')
@@ -79,6 +81,9 @@ class Session:
     def _progress(self, distance):
         self.remaining = distance if distance > 0.0 else None  # 0: Nav2 has no path (yet)
 
+    def _note(self, text):
+        self.note = text
+
     def _tool_done(self, call, result):
         self.remaining = None
         if self._closing:  # the robot is stopped and refuses new goals; nobody will read the model's answer
@@ -89,7 +94,7 @@ class Session:
         text = text.strip()
         if not text or self.state != 'idle':
             return False
-        self.remaining = None
+        self.remaining = self.note = None
         self._set_state('busy')
         self.on_event('user', text)
         self.robot.clear_cancel()  # a Stop left over from the last command must not hit this one
@@ -100,7 +105,7 @@ class Session:
             except BaseException as e:
                 gemini = type(e).__name__ == 'GeminiError'  # its message is written for the user
                 kind, out = 'error', str(e) if gemini else INTERNAL % type(e).__name__
-            self.remaining = None
+            self.remaining = self.note = None
             self.on_event(kind, out)
             self._set_state('idle')
         self._job = self._run(job)
@@ -109,20 +114,27 @@ class Session:
     def go_to(self, x, y):
         """Send the dog to map point (x, y) clicked on the map: the go_to_pose tool, without the model.
         False when the session is not idle."""
+        return self._run_tool(MAP_LINE % (x, y), 'go_to_pose', {'x': x, 'y': y})
+
+    def survey(self):
+        """Walk around and remember what is seen (the survey tool), without the model. False unless idle."""
+        return self._run_tool(SURVEY_LINE, 'survey', {})
+
+    def _run_tool(self, line, name, args):
+        """One tool call in the background, shown as `line` and then its tool line, like a command."""
         if self.state != 'idle':
             return False
-        self.remaining = None
+        self.remaining = self.note = None
         self._set_state('busy')
         self.robot.clear_cancel()
-        args = {'x': x, 'y': y}
-        self.on_event('log', MAP_LINE % (x, y))
+        self.on_event('log', line)
 
         def job():
             try:
-                kind, out = 'log', tool_line('go_to_pose', args, self._agent.toolbox.call('go_to_pose', args))
+                kind, out = 'log', tool_line(name, args, self._agent.toolbox.call(name, args))
             except BaseException as e:
                 kind, out = 'error', INTERNAL % type(e).__name__
-            self.remaining = None
+            self.remaining = self.note = None
             self.on_event(kind, out)
             self._set_state('idle')
         self._job = self._run(job)
@@ -143,8 +155,11 @@ class Session:
             return None
 
     def status_text(self):
-        if self.state == 'busy' and self.remaining is not None:
-            return '導航中，剩 %.1f m' % self.remaining
+        note, remaining = self.note, self.remaining  # set from the worker thread: read each once
+        if self.state == 'busy' and note:
+            return note + ('，剩 %.1f m' % remaining if remaining is not None else '')
+        if self.state == 'busy' and remaining is not None:
+            return '導航中，剩 %.1f m' % remaining
         return STATUS[self.state]
 
     def shutdown(self, timeout=10.0):

@@ -14,6 +14,7 @@ from robot_dog_agent.agent import Agent
 from robot_dog_agent.gemini import GeminiClient, GeminiError
 from robot_dog_agent.robot import FakeRobot
 
+VISION_MODEL = 'gemini-3.5-flash-lite'  # for the pictures (gemini.GeminiClient.ask_image)
 DEFAULT_MODEL = 'gemini-3.5-flash-lite'  # gemini-3.6-flash: only 20 requests per day on the free tier
 NO_KEY = """找不到環境變數 GEMINI_API_KEY。
 1. 到 https://aistudio.google.com/ 申請 API key（免費額度就夠用）。
@@ -31,10 +32,11 @@ def usable_key(raw):
     return key
 
 
-def build_agent(robot, api_key, model, say=print, on_call=None, on_progress=None):
+def build_agent(robot, api_key, model, say=print, on_call=None, on_progress=None, eyes=None, on_note=None):
     """An Agent on Gemini that drives `robot`; progress and tool calls are reported through say.
 
     on_progress(distance) takes the progress instead of say (the window shows it in its status bar).
+    eyes (eyes.Eyes) adds the camera tools; on_note(text) hears what a long tool is doing.
     """
     def show_call(call, result):
         say(tools.tool_line(call.name, call.args, result))
@@ -45,8 +47,10 @@ def build_agent(robot, api_key, model, say=print, on_call=None, on_progress=None
         if distance > 0.0:  # 0: Nav2 has no path (yet)
             say('  剩 %.1f m' % distance)
 
-    toolbox = tools.Toolbox(robot, places.load_body_truth(), on_progress=on_progress or show_progress)
-    llm = GeminiClient(api_key, model, tools.system_instruction(), tools.DECLARATIONS, say=say)
+    toolbox = tools.Toolbox(robot, places.load_body_truth(), on_progress=on_progress or show_progress, eyes=eyes,
+                            on_note=on_note)
+    with_eyes = eyes is not None
+    llm = GeminiClient(api_key, model, tools.system_instruction(with_eyes), tools.declarations(with_eyes), say=say)
     return Agent(llm, toolbox, on_call=show_call)
 
 
