@@ -84,16 +84,32 @@ def nearest_place(x, y):
 
 STAND_RADII = (0.5, 0.6, 0.7, 0.8, 0.9, 1.0)  # m from the thing
 STAND_ANGLES = 24                             # candidates per radius
+SIGHT_STEP = 0.05                             # m between the checked points of a line of sight
+SIGHT_SHORT = 0.15                            # m before the thing where the line of sight may end (its surface)
+
+
+def clear_line(truth, start, end):
+    """True when nothing blocks the way from start to within SIGHT_SHORT of end (no wall between them)."""
+    grid, res, origin = truth
+    length = math.hypot(end[0] - start[0], end[1] - start[1])
+    steps = max(int((length - SIGHT_SHORT) / SIGHT_STEP), 0)
+    for k in range(steps + 1):
+        t = k * SIGHT_STEP / length if length else 0.0
+        r, c = to_cell(res, origin, start[0] + t * (end[0] - start[0]), start[1] + t * (end[1] - start[1]))
+        if not (0 <= r < grid.shape[0] and 0 <= c < grid.shape[1]) or grid[r, c] == 100:
+            return False
+    return True
 
 
 def stand_near(truth, target, robot_xy):
-    """(x, y, yaw) to stop at near the point target, facing it: the reachable candidate nearest the robot, or None."""
+    """(x, y, yaw) to stop at near the point target, facing it: the reachable candidate with nothing between it and
+    the target that is nearest the robot, or None."""
     best = None
     for radius in STAND_RADII:
         for k in range(STAND_ANGLES):
             a = 2.0 * math.pi * k / STAND_ANGLES
             x, y = target[0] + radius * math.cos(a), target[1] + radius * math.sin(a)
-            if check_target(truth, x, y) is not None:
+            if check_target(truth, x, y) is not None or not clear_line(truth, (x, y), target):
                 continue
             d = math.hypot(x - robot_xy[0], y - robot_xy[1])
             if best is None or d < best[0]:

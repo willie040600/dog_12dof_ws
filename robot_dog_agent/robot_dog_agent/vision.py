@@ -17,6 +17,8 @@ Snapshot = namedtuple('Snapshot', 'rgb width height depth K T_map_cam')  # RGB b
 MIN_RANGE, MAX_RANGE = 0.1, 5.0  # m of depth that is trusted
 INNER = 0.5                      # share of a box's width and height, around its centre, whose depth is used
 MIN_PIXELS = 20                  # fewer valid depth pixels than this: no distance
+DEPTH_QUANTILE = 10              # percentile of the box's depths taken as its distance: the near side. A median
+                                 # lands on the wall behind see-through furniture (chairs, tables)
 
 PROMPT = """\
 List the furniture and large objects you can see in this picture from a robot's camera in an apartment.
@@ -65,12 +67,13 @@ def box_pixels(box, width, height):
 
 
 def box_depth(depth, pixels):
-    """Median depth of the middle of the box, or None when too little of it is valid and in range."""
+    """Depth of the near side of the thing in the middle of the box (DEPTH_QUANTILE), or None when too little of
+    it is valid and in range."""
     u0, v0, u1, v1 = pixels
     du, dv = (u1 - u0) * (1.0 - INNER) / 2.0, (v1 - v0) * (1.0 - INNER) / 2.0
     patch = np.asarray(depth)[int(v0 + dv):int(np.ceil(v1 - dv)), int(u0 + du):int(np.ceil(u1 - du))]
     valid = patch[np.isfinite(patch) & (patch >= MIN_RANGE) & (patch <= MAX_RANGE)]
-    return float(np.median(valid)) if valid.size >= MIN_PIXELS else None
+    return float(np.percentile(valid, DEPTH_QUANTILE)) if valid.size >= MIN_PIXELS else None
 
 
 def transform_matrix(translation, quaternion):

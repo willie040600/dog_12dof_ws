@@ -49,6 +49,14 @@ class ObjectMemory:
         self._items = {}
         self._save()
 
+    def snapshot(self):
+        """Everything remembered, to put back with restore()."""
+        return dict(self._items), self._next
+
+    def restore(self, state):
+        self._items, self._next = dict(state[0]), max(state[1], self._next)
+        self._save()
+
     def _load(self):
         try:
             with open(self.path) as f:

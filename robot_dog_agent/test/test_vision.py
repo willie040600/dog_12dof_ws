@@ -91,3 +91,27 @@ def test_encode_jpeg_round_trip():
     assert picture.shape == (2, 4, 3)
     b, g, r = picture[0, 0]
     assert r > 200 and g < 60 and b < 60
+
+
+# --- final review: see-through furniture ---
+
+import os  # noqa: E402
+
+DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+
+
+def test_box_depth_takes_the_near_side():
+    depth = np.full((480, 640), 4.0, np.float32)          # the wall behind
+    depth[180:300, 240:290] = 1.5                          # a chair's back filling ~30 % of the box's middle
+    assert abs(box_depth(depth, (160, 120, 480, 360)) - 1.5) < 1e-6
+
+
+def test_a_chair_seen_through_lands_on_the_chair():
+    # recorded in the simulator from the start: Gemini's box around a dining chair, mostly the far wall behind it
+    z = np.load(os.path.join(DATA, 'chair_through.npz'))
+    u0, v0 = z['offset']
+    pixels = box_pixels(tuple(z['box']), 640, 480)
+    crop_pixels = (pixels[0] - u0, pixels[1] - v0, pixels[2] - u0, pixels[3] - v0)
+    distance = box_depth(z['depth'], crop_pixels)
+    x, y = pixel_to_map((pixels[0] + pixels[2]) / 2.0, (pixels[1] + pixels[3]) / 2.0, distance, z['K'], z['T'])
+    assert 1.57 - 0.1 <= x <= 2.03 + 0.1 and -0.15 - 0.1 <= y <= 0.30 + 0.1   # DiningChair_1's footprint (USD)

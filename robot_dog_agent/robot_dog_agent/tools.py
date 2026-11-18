@@ -54,6 +54,7 @@ MAX_RELATIVE = 5.0   # m, per axis of move_relative
 TURNS = 4            # looks per spot, a quarter turn apart
 MAX_LOOKS = 32       # pictures one survey or one search may send to the model
 EYE_TOOLS = {d['name'] for d in EYE_DECLARATIONS}
+MAX_FAILED_IN_A_ROW = 3  # pictures that failed one after another: stop instead of walking on blind
 
 INSTRUCTION = """\
 You control a quadruped robot dog in a simulated apartment through the tools. The user types commands in Chinese.
@@ -123,6 +124,7 @@ class Toolbox:
     def __init__(self, robot, truth, on_progress=None, eyes=None, on_note=None):
         self.robot, self.truth, self.on_progress, self.eyes = robot, truth, on_progress, eyes
         self.on_note = on_note or (lambda text: None)
+        self._failed_in_a_row, self._last_failure = 0, ''
 
     def call(self, name, args):
         handler = {'get_pose': self._get_pose, 'go_to_place': self._go_to_place, 'go_to_pose': self._go_to_pose,
@@ -214,9 +216,13 @@ class Toolbox:
                 break
             try:
                 seen = self.eyes.look(target)
-            except Exception:  # the model or the camera failed for this picture; the next one may work
-                seen = None
+                self._failed_in_a_row = 0
+            except Exception as e:  # the model or the camera failed for this picture; the next one may work
+                seen, self._failed_in_a_row = None, self._failed_in_a_row + 1
+                self._last_failure = str(e) or type(e).__name__
             looks.append(seen)
+            if self._failed_in_a_row >= MAX_FAILED_IN_A_ROW:
+                return looks, 'failing'
             if target and seen:
                 return looks, 'found'
             if k < TURNS - 1 or not target:
@@ -225,8 +231,14 @@ class Toolbox:
                     return looks, 'canceled'
         return looks, 'done'
 
+    def _failing(self):
+        return {'status': 'error', 'reason': 'the camera pictures keep failing: %s' % self._last_failure}
+
     def _look_around(self, args, pose):
+        self._failed_in_a_row = 0
         looks, status = self._look_four_ways(None, TURNS)
+        if status == 'failing':
+            return self._failing()
         if status == 'canceled':
             return {'status': 'canceled', 'reason': 'canceled by the user'}
         names = []
@@ -235,8 +247,10 @@ class Toolbox:
         return {'status': 'ok', 'seen': names, 'remembered': len(self.eyes.memory.items)}
 
     def _survey(self, args, pose):
+        before = self.eyes.memory.snapshot()  # put back when no picture works at all
         self.eyes.memory.clear()
         looks = failed = 0
+        self._failed_in_a_row = 0
         skipped = []
         for i, place in enumerate(places.PLACES, 1):
             self.on_note('巡邏中 %d/%d' % (i, len(places.PLACES)))
@@ -251,6 +265,10 @@ class Toolbox:
             seen, status = self._look_four_ways(None, MAX_LOOKS - looks)
             looks += len(seen)
             failed += sum(s is None for s in seen)
+            if status == 'failing':
+                if failed == looks:
+                    self.eyes.memory.restore(before)
+                return self._failing()
             if status == 'canceled':
                 return {'status': 'canceled', 'reason': 'canceled by the user',
                         'remembered': len(self.eyes.memory.items)}
@@ -262,6 +280,7 @@ class Toolbox:
         if not isinstance(name, str) or not name.strip():
             raise BadArguments('name must be the thing to look for')
         name, looks = name.strip(), 0
+        self._failed_in_a_row = 0
         order = sorted(places.PLACES, key=lambda p: math.hypot(p.x - pose[0], p.y - pose[1]))
         for place in order:
             if looks >= MAX_LOOKS:
@@ -274,6 +293,8 @@ class Toolbox:
                 continue
             seen, status = self._look_four_ways(name, MAX_LOOKS - looks)
             looks += len(seen)
+            if status == 'failing':
+                return self._failing()
             if status == 'canceled':
                 return {'status': 'canceled', 'reason': 'canceled by the user'}
             if status == 'found':

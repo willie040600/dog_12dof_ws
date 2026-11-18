@@ -307,3 +307,23 @@ def test_forget_objects(tmp_path):
     t, _, eyes, _ = eye_box(tmp_path)
     eyes.memory.add(Seen('沙發', 0.0, -0.75, 1.0, 1.8))
     assert t.call('forget_objects', {}) == {'status': 'ok'} and eyes.memory.items == []
+
+
+def test_find_stops_when_the_pictures_keep_failing(tmp_path):
+    t, _, eyes, _ = eye_box(tmp_path, script=[RuntimeError('quota used up')] * 40)
+    r = t.call('find_object', {'name': '洗衣機'})
+    assert r['status'] == 'error' and 'quota used up' in r['reason'] and len(eyes.targets) == 3
+
+
+def test_survey_stops_and_keeps_the_memory_when_the_pictures_keep_failing(tmp_path):
+    t, _, eyes, _ = eye_box(tmp_path, script=[RuntimeError('no camera image yet')] * 40)
+    eyes.memory.add(Seen('沙發', 0.0, -0.75, 1.0, 1.8))
+    r = t.call('survey', {})
+    assert r['status'] == 'error' and 'no camera image yet' in r['reason'] and len(eyes.targets) == 3
+    assert [i.name for i in eyes.memory.items] == ['沙發']
+
+
+def test_a_failure_now_and_then_does_not_stop_a_survey(tmp_path):
+    t, _, _, _ = eye_box(tmp_path, script=[RuntimeError('x'), [], RuntimeError('x'), RuntimeError('x'), []])
+    r = t.call('survey', {})
+    assert r['status'] == 'ok' and r['failed_looks'] == 3

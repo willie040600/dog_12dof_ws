@@ -60,3 +60,9 @@ def test_stand_near_picks_the_side_nearest_the_robot():
 
 def test_stand_near_nowhere():
     assert places.stand_near(TRUTH, (20.0, 0.0), (0.0, 0.0)) is None
+
+
+def test_stand_near_stays_on_the_things_side_of_a_wall():
+    # the dog in the master bedroom, the TV cabinet's front in the living room, a wall at y ~1.25 between them
+    x, y, _ = places.stand_near(TRUTH, (-0.68, 0.81), (-1.5, 3.0))
+    assert y < 1.2
