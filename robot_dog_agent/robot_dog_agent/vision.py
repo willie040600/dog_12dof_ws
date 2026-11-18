@@ -22,6 +22,7 @@ PROMPT = """\
 List the furniture and large objects you can see in this picture from a robot's camera in an apartment.
 Answer with a JSON array only, no other text. Each item: {"label": <short name in Traditional Chinese>,
 "box_2d": [ymin, xmin, ymax, xmax]} with the coordinates scaled to 0-1000. One item per object.
+Do not list parts of the room itself: walls, floor, ceiling, doors, windows, skirting, pillars.
 If there is nothing, answer []."""
 TARGET_PROMPT = """\
 Is there a %s in this picture from a robot's camera in an apartment? Answer with a JSON array only, no other text:

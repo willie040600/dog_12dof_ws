@@ -72,6 +72,7 @@ def test_detection_prompt():
     for prompt in (plain, target):
         assert 'box_2d' in prompt and '1000' in prompt and 'label' in prompt
     assert '洗衣機' in target and '洗衣機' not in plain
+    assert 'walls' in plain and 'floor' in plain                 # the room itself is not a thing to remember
 
 
 def test_depth_from_msg():
