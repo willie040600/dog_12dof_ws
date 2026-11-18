@@ -79,26 +79,37 @@ def imu_graph(stage, imu_path, topic='/imu', frame_id='imu_link'):
 
 
 def camera_graph(stage, cam_path, size, topic='/camera/image_raw', info_topic='/camera/camera_info',
-                 frame_id='camera_optical_link', frame_skip=0):
-    """frame_skip: app updates skipped between publishes (2 at the 50 Hz policy rate = ~16.7 Hz)."""
+                 depth_topic='/camera/depth/image_raw', frame_id='camera_optical_link', frame_skip=0):
+    """frame_skip: app updates skipped between publishes (2 at the 50 Hz policy rate = ~16.7 Hz).
+
+    The depth image (32FC1, metres along the optical axis) comes from the same render product as the colour image,
+    so the two share their time stamps and line up pixel for pixel.
+    """
     width, height = size
     graph(stage, '/ROS/camera',
           [TICK, CONTEXT, RENDER_PRODUCT,
            ('PubImage', ROS + 'ROS2CameraHelper'),
+           ('PubDepth', ROS + 'ROS2CameraHelper'),
            ('PubInfo', ROS + 'ROS2CameraInfoHelper')],
           [('RenderProduct.inputs:cameraPrim', [Sdf.Path(cam_path)]),
            ('RenderProduct.inputs:width', width), ('RenderProduct.inputs:height', height),
            ('PubImage.inputs:type', 'rgb'), ('PubImage.inputs:topicName', topic),
            ('PubImage.inputs:frameId', frame_id),
+           ('PubDepth.inputs:type', 'depth'), ('PubDepth.inputs:topicName', depth_topic),
+           ('PubDepth.inputs:frameId', frame_id),
            ('PubInfo.inputs:topicName', info_topic),
            ('PubInfo.inputs:frameId', frame_id),
-           ('PubImage.inputs:frameSkipCount', frame_skip), ('PubInfo.inputs:frameSkipCount', frame_skip)],
+           ('PubImage.inputs:frameSkipCount', frame_skip), ('PubDepth.inputs:frameSkipCount', frame_skip),
+           ('PubInfo.inputs:frameSkipCount', frame_skip)],
           [('Tick.outputs:tick', 'RenderProduct.inputs:execIn'),
            ('RenderProduct.outputs:execOut', 'PubImage.inputs:execIn'),
+           ('RenderProduct.outputs:execOut', 'PubDepth.inputs:execIn'),
            ('RenderProduct.outputs:execOut', 'PubInfo.inputs:execIn'),
            ('RenderProduct.outputs:renderProductPath', 'PubImage.inputs:renderProductPath'),
+           ('RenderProduct.outputs:renderProductPath', 'PubDepth.inputs:renderProductPath'),
            ('RenderProduct.outputs:renderProductPath', 'PubInfo.inputs:renderProductPath'),
            ('Context.outputs:context', 'PubImage.inputs:context'),
+           ('Context.outputs:context', 'PubDepth.inputs:context'),
            ('Context.outputs:context', 'PubInfo.inputs:context')])
 
 
