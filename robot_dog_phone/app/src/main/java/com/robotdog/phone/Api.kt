@@ -1,5 +1,6 @@
 package com.robotdog.phone
 
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONException
@@ -51,6 +52,7 @@ class Api(val address: String, private val code: String) {
             check(connection)
             connection.inputStream.use { it.readBytes() }
         } catch (e: IOException) {
+            Log.w(TAG, "$path: $e")
             throw ApiError.Unreachable()
         } finally {
             connection.disconnect()
@@ -99,6 +101,7 @@ class Api(val address: String, private val code: String) {
     }
 
     companion object {
+        const val TAG = "robotdog"
         const val CONNECT_TIMEOUT = 3000  // ms
         const val READ_TIMEOUT = 5000     // ms
         const val EVENTS_TIMEOUT = 30000  // ms: the server holds a request for up to 25 s

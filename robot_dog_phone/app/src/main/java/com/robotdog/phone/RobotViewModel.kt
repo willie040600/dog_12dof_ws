@@ -41,6 +41,8 @@ class RobotViewModel(application: Application) : AndroidViewModel(application) {
         private set
     var pendingTarget by mutableStateOf<Point?>(null)
         private set
+    /** False when Android 17+ was refused the local network permission: the PC cannot be reached. */
+    var localNetworkAllowed by mutableStateOf(true)
 
     private var api: Api? = null
     private var loops: Job? = null
@@ -73,6 +75,12 @@ class RobotViewModel(application: Application) : AndroidViewModel(application) {
     fun openSetup() {
         pause()
         connection = Connection.NeedsSetup
+    }
+
+    /** Back from the settings page without changing them. */
+    fun closeSetup() {
+        connection = Connection.Retrying
+        resume()
     }
 
     /** Start the three loops: state every 0.2 s, events by long poll, the camera. */
