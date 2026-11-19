@@ -13,6 +13,7 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>nav2_simple_commander</exec_depend>
+  <exec_depend>lifecycle_msgs</exec_depend>
   <exec_depend>robot_dog_navigation</exec_depend>
   <exec_depend>python3-requests</exec_depend>
   <exec_depend>python3-pyqt5</exec_depend>

@@ -4,6 +4,7 @@ import time
 
 import rclpy
 from nav2_simple_commander.robot_navigator import BasicNavigator
+from lifecycle_msgs.srv import GetState
 from rclpy.logging import LoggingSeverity
 from rclpy.parameter import Parameter
 from rclpy.signals import SignalHandlerOptions
@@ -17,6 +18,7 @@ PROGRESS_PERIOD = 2.0  # s of wall time between on_progress calls
 POSE_WAIT = 5.0        # s of wall time to wait for map->base_footprint
 HEADING_SLACK = 0.1    # rad; a heading this close to the wanted one is left alone
 LOCALIZATION_WAIT = 60.0  # the same at start-up, when AMCL / slam_toolbox may still be coming up
+NAV2_ANSWER_WAIT = 2.0    # s of wall time for bt_navigator to say whether it is active, before asking again
 
 
 class Nav2Robot:
@@ -43,12 +45,38 @@ class Nav2Robot:
             # 'robot_localization' = do not wait for AMCL the BasicNavigator way: that publishes an initial pose at
             # the origin, which throws AMCL off whenever the chat starts with the dog somewhere else.
             # Its INFO lines ("... service not available, waiting...") are the only sign of life while Nav2 is not up
-            self.node.waitUntilNav2Active(localizer='robot_localization')
+            self._wait_for_nav2()
             self.node.get_logger().set_level(LoggingSeverity.WARN)  # from here on they would clutter the chat
             self.pose(wait=LOCALIZATION_WAIT)
         except BaseException:
             self.close()  # else the TF thread keeps the process alive after the error
             raise
+
+    def _wait_for_nav2(self):
+        """Until bt_navigator is active. BasicNavigator.waitUntilNav2Active waits for each answer without a time
+        limit, and the first answer can be lost while DDS is still matching the new client (measured when the server
+        restarted: "failed to send response ... timeout"), which left it waiting for ever."""
+        client = self.node.create_client(GetState, 'bt_navigator/get_state')
+        try:
+            while True:
+                if not client.wait_for_service(timeout_sec=1.0):
+                    self.node.get_logger().info('bt_navigator/get_state service not available, waiting...')
+                    continue
+                future = client.call_async(GetState.Request())
+                rclpy.spin_until_future_complete(self.node, future, timeout_sec=NAV2_ANSWER_WAIT)
+                if future.done() and future.result() is not None and future.result().current_state.label == 'active':
+                    return
+                if not future.done():  # lost or late: ask again
+                    client.remove_pending_request(future)
+                time.sleep(0.5)
+        finally:
+            self.node.destroy_client(client)
+
+    def _now(self):
+        """Sim seconds now, from the TF node, which its own thread spins all the time. BasicNavigator's node is
+        spun only while it waits for something, so its clock is stale (0 before the first /clock) when a command
+        starts: a navigation measured from it timed out at once once the simulator had run for 120 s."""
+        return sim_seconds(self._tf_node)
 
     def cancel(self):
         """From any thread: end the navigation under way and refuse every one after it, until clear_cancel()."""
@@ -72,7 +100,7 @@ class Nav2Robot:
 
     def go_to(self, x, y, yaw, on_progress=None):
         nav = self.node
-        t0 = sim_seconds(nav)
+        t0 = self._now()
         angle = turn_in_place(self.pose(), x, y, yaw)
         if angle is not None:
             # a turn on the spot: Nav2's spin ends about 5 deg past the angle (measured); a goal at the same
@@ -91,23 +119,23 @@ class Nav2Robot:
             trim = self._wait(lambda: nav.spin(spin_dist=rest, time_allowance=15), t0, None)
             if trim.status == 'canceled':
                 return trim
-        return NavResult('reached', '', sim_seconds(nav) - t0)
+        return NavResult('reached', '', self._now() - t0)
 
     def _wait(self, send, t0, on_progress):
         """Send a task with send() -> accepted and wait for it to end; the NavResult counts sim time from t0."""
         nav = self.node
         nav.feedback = None  # BasicNavigator keeps the last task's feedback, which may be of another type
         if self._cancel.is_set():  # Stop came before this started: while waiting for the model, or a step ago
-            return NavResult('canceled', CANCELED, sim_seconds(nav) - t0)
+            return NavResult('canceled', CANCELED, self._now() - t0)
         if not send():
-            return NavResult('failed', 'Nav2 rejected the goal', sim_seconds(nav) - t0)
+            return NavResult('failed', 'Nav2 rejected the goal', self._now() - t0)
         last, ended = time.monotonic(), None
         try:
             while not nav.isTaskComplete():
                 if ended is None and self._cancel.is_set():
                     ended = ('canceled', CANCELED)
                     nav.cancelTask()
-                if ended is None and sim_seconds(nav) - t0 > self.timeout:
+                if ended is None and self._now() - t0 > self.timeout:
                     ended = ('timeout', 'no arrival within %.0f s' % self.timeout)
                     nav.cancelTask()
                 if on_progress and ended is None and time.monotonic() - last >= PROGRESS_PERIOD:
@@ -123,7 +151,7 @@ class Nav2Robot:
         except BaseException:
             nav.cancelTask()  # never leave the dog walking with nobody watching
             raise
-        elapsed = sim_seconds(nav) - t0
+        elapsed = self._now() - t0
         if ended:
             return NavResult(ended[0], ended[1], elapsed)
         status = nav.getResult().name  # SUCCEEDED / CANCELED / FAILED / UNKNOWN
