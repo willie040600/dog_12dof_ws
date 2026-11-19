@@ -24,6 +24,8 @@ Sources = namedtuple('Sources', 'latest_frame latest_map latest_path objects can
 LONG_POLL = 25.0     # s an /api/events request waits for something new
 JPEG_QUALITY = 70
 FRAME_PERIOD = 0.1   # s between camera pictures
+KEEPALIVE = 1.0      # s without a picture before an empty part is sent: shows "no picture" on the phone, and a
+                     # write is the only way to notice that the phone has gone (else its thread would stay)
 STALE_AFTER = 3.0    # s; an older picture is not sent
 ERRORS = {401: '配對碼錯誤', 429: '錯太多次，請一分鐘後再試', 400: '看不懂這個請求', 404: '沒有這個東西'}
 
@@ -102,23 +104,32 @@ class PhoneServer:
                 return self.session.submit(args['text'])
             if name == 'survey':
                 return bool(self.sources.can_survey) and self.session.survey()
+            if self.session.state != 'idle':  # refused anyway: keep the running command's target
+                return False
+            # the target first: a refused point (a wall) ends its job, busy then idle, before go_to returns, and the
+            # target must already be there for idle to start its 2 s
+            self.tracker.set_target(args['x'], args['y'])
             ok = self.session.go_to(args['x'], args['y'])
-            if ok:
-                self.tracker.set_target(args['x'], args['y'])
+            if not ok:
+                self.tracker.clear_target()
             return ok
 
     def stream_camera(self, write):
         """Write JPEG parts until the phone goes away or the server closes."""
-        shown = None
+        shown, written = None, time.monotonic()
         while not self._closing.is_set():
             frame = self.sources.latest_frame()
+            jpeg = None
             if frame is not None:
                 width, height, rgb, stamp = frame
                 if stamp != shown and self.clock() - stamp <= STALE_AFTER and len(rgb) == width * height * 3:
-                    jpeg = encode_jpeg(rgb, width, height, JPEG_QUALITY)
-                    write(b'--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n' % len(jpeg)
-                          + jpeg + b'\r\n')
-                    shown = stamp
+                    jpeg, shown = encode_jpeg(rgb, width, height, JPEG_QUALITY), stamp
+            if jpeg is None and time.monotonic() - written >= KEEPALIVE:
+                jpeg = b''
+            if jpeg is not None:
+                write(b'--frame\r\nContent-Type: image/jpeg\r\nContent-Length: %d\r\n\r\n' % len(jpeg)
+                      + jpeg + b'\r\n')
+                written = time.monotonic()
             self._closing.wait(FRAME_PERIOD)
 
     # HTTP ------------------------------------------------------------------------------------------------------

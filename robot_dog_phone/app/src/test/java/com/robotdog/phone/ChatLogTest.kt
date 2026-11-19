@@ -21,7 +21,7 @@ class ChatLogTest {
     @Test fun continuesWithinABoot() {
         val log = ChatLog()
         assertEquals(2, log.apply(events("a", 1 to ("log" to "1"), 2 to ("log" to "2"))))
-        assertEquals(3, log.apply(events("a", 3 to ("log" to "3"))))
+        assertEquals(3, log.apply(events("a", 3 to ("log" to "3")), askedAfter = 2))
         assertEquals(listOf("1", "2", "3"), log.lines)
     }
 
@@ -35,10 +35,18 @@ class ChatLogTest {
         assertEquals(listOf("new 1", "new 2", "new 3"), log.lines)
     }
 
+    @Test fun askingFromTheStartAgainDoesNotRepeatTheConversation() {
+        // the app came back to the foreground: its new event loop asks after 0 and gets everything kept again
+        val log = ChatLog()
+        log.apply(events("a", 1 to ("log" to "1"), 2 to ("log" to "2")))
+        assertEquals(2, log.apply(events("a", 1 to ("log" to "1"), 2 to ("log" to "2")), askedAfter = 0))
+        assertEquals(listOf("1", "2"), log.lines)
+    }
+
     @Test fun emptyAnswerKeepsTheNumber() {
         val log = ChatLog()
         log.apply(events("a", 1 to ("log" to "1")))
-        assertEquals(1, log.apply(Events("a", emptyList(), 1)))
+        assertEquals(1, log.apply(Events("a", emptyList(), 1), askedAfter = 1))
         assertEquals(listOf("1"), log.lines)
     }
 }

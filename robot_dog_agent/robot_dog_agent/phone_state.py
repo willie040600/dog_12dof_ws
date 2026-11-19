@@ -85,6 +85,10 @@ class MapTracker:
         with self._lock:
             self._target, self._target_until = _point(x, y), None
 
+    def clear_target(self):
+        with self._lock:
+            self._target, self._target_until = None, None
+
     def snapshot(self, latest_path):
         """(path version, path [[x, y], ...], target [x, y] or None); latest_path is MapFeed.latest_path()."""
         with self._lock:

@@ -7,6 +7,7 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.MalformedURLException
 import java.net.URL
 
 /** Why a request failed, in the words the app shows. */
@@ -16,6 +17,7 @@ sealed class ApiError(message: String) : Exception(message) {
     class BadCode : ApiError("配對碼錯誤")
     class Locked : ApiError("錯太多次，請一分鐘後再試")
     class Http(val code: Int) : ApiError("伺服器回應錯誤（HTTP $code）")
+    class BadAddress : ApiError("位址格式不對，例如 192.168.0.154:8765")
 }
 
 /** The server on the PC (spec 2026-11-19, 4); address is host:port. Every call runs on Dispatchers.IO. */
@@ -27,6 +29,26 @@ class Api(val address: String, private val code: String) {
         connection.useCaches = false
         if (withCode) connection.setRequestProperty("Authorization", "Bearer $code")
         return connection
+    }
+
+    /** open(), with a typo in the address (a letter in the port, a port past 65535) as an ApiError. */
+    private fun openChecked(path: String, readTimeout: Int, withCode: Boolean = true): HttpURLConnection = try {
+        val port = address.substringAfterLast(':', "").toIntOrNull()
+        if (address.substringBeforeLast(':', "").isBlank() || port == null || port !in 1..65535) {
+            throw ApiError.BadAddress()
+        }
+        open(path, readTimeout, withCode)
+    } catch (e: MalformedURLException) {
+        throw ApiError.BadAddress()
+    } catch (e: IllegalArgumentException) {
+        throw ApiError.BadAddress()
+    }
+
+    /** A parsed answer; one that does not have our shape means another program answers at this address. */
+    private inline fun <T> ours(parse: () -> T): T = try {
+        parse()
+    } catch (e: JSONException) {
+        throw ApiError.NotOurServer()
     }
 
     private fun check(connection: HttpURLConnection) {
@@ -41,7 +63,7 @@ class Api(val address: String, private val code: String) {
     private suspend fun request(
         path: String, body: String? = null, readTimeout: Int = READ_TIMEOUT, withCode: Boolean = true,
     ): ByteArray = withContext(Dispatchers.IO) {
-        val connection = open(path, readTimeout, withCode)
+        val connection = openChecked(path, readTimeout, withCode)
         try {
             if (body != null) {
                 connection.requestMethod = "POST"
@@ -54,6 +76,8 @@ class Api(val address: String, private val code: String) {
         } catch (e: IOException) {
             Log.w(TAG, "$path: $e")
             throw ApiError.Unreachable()
+        } catch (e: IllegalArgumentException) {  // a port past 65535 shows up only when connecting
+            throw ApiError.BadAddress()
         } finally {
             connection.disconnect()
         }
@@ -62,7 +86,7 @@ class Api(val address: String, private val code: String) {
     private suspend fun text(path: String, body: String? = null, readTimeout: Int = READ_TIMEOUT) =
         request(path, body, readTimeout).toString(Charsets.UTF_8)
 
-    private suspend fun ok(path: String, body: String = "{}") = JSONObject(text(path, body)).getBoolean("ok")
+    private suspend fun ok(path: String, body: String = "{}") = text(path, body).let { ours { JSONObject(it).getBoolean("ok") } }
 
     /** Is this the robot dog's server? Needs no code. */
     suspend fun ping() {
@@ -76,9 +100,10 @@ class Api(val address: String, private val code: String) {
         if (answer != "robot_dog_phone") throw ApiError.NotOurServer()
     }
 
-    suspend fun hello(): Hello = parseHello(text("/api/hello"))
-    suspend fun state(pathVersion: Int): RobotState = parseState(text("/api/state?path=$pathVersion"))
-    suspend fun events(after: Int): Events = parseEvents(text("/api/events?after=$after", readTimeout = EVENTS_TIMEOUT))
+    suspend fun hello(): Hello = text("/api/hello").let { ours { parseHello(it) } }
+    suspend fun state(pathVersion: Int): RobotState = text("/api/state?path=$pathVersion").let { ours { parseState(it) } }
+    suspend fun events(after: Int): Events =
+        text("/api/events?after=$after", readTimeout = EVENTS_TIMEOUT).let { ours { parseEvents(it) } }
     suspend fun command(text: String): Boolean = ok("/api/command", JSONObject().put("text", text).toString())
     suspend fun goTo(x: Double, y: Double): Boolean = ok("/api/go_to", JSONObject().put("x", x).put("y", y).toString())
     suspend fun survey(): Boolean = ok("/api/survey")
@@ -87,13 +112,16 @@ class Api(val address: String, private val code: String) {
 
     /** The camera stream; the caller closes it (which also ends the connection). */
     suspend fun camera(): MjpegReader = withContext(Dispatchers.IO) {
-        val connection = open("/api/camera.mjpg", CAMERA_TIMEOUT)
+        val connection = openChecked("/api/camera.mjpg", CAMERA_TIMEOUT)
         try {
             check(connection)
             MjpegReader(connection.inputStream)
         } catch (e: IOException) {
             connection.disconnect()
             throw ApiError.Unreachable()
+        } catch (e: IllegalArgumentException) {
+            connection.disconnect()
+            throw ApiError.BadAddress()
         } catch (e: ApiError) {
             connection.disconnect()
             throw e

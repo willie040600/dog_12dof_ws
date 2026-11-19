@@ -58,6 +58,21 @@ class ApiTest {
         assertFails<ApiError.Unreachable> { runBlocking { Api("127.0.0.1:$free", "1").ping() } }
     }
 
+    @Test fun aBadAddressIsAnApiError() = runBlocking {
+        assertFails<ApiError.BadAddress> { runBlocking { Api("192.168.0.154:87a5", "1").ping() } }
+        assertFails<ApiError.BadAddress> { runBlocking { Api("192.168.0.154:99999", "1").hello() } }
+    }
+
+    @Test fun anAnswerThatIsNotOursIsAnApiError() = runBlocking {
+        answer("/api/state", 200, "{}")
+        answer("/api/hello", 200, "<html>router</html>", "text/html")
+        answer("/api/command", 200, "[]")
+        val api = Api(address, "1")
+        assertFails<ApiError.NotOurServer> { runBlocking { api.state(-1) } }
+        assertFails<ApiError.NotOurServer> { runBlocking { api.hello() } }
+        assertFails<ApiError.NotOurServer> { runBlocking { api.command("x") } }
+    }
+
     @Test fun pingNeedsNoCode() = runBlocking {
         answer("/api/ping", 200, """{"app": "robot_dog_phone", "version": 1}""")
         Api(address, "123456").ping()

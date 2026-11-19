@@ -18,6 +18,7 @@ class ChatLog {
             shown.clear()
             if (askedAfter != 0) return 0
         }
+        if (askedAfter == 0) shown.clear()  // everything the server keeps is coming again (e.g. back from the background)
         for (e in events.events) {
             if (e.kind != "state") shown += prefix(e.kind) + e.text
         }

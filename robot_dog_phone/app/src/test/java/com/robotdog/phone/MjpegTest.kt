@@ -24,6 +24,12 @@ class MjpegTest {
         assertNull(reader.next())
     }
 
+    @Test fun emptyPartIsAnEmptyPicture() {  // the server's keep-alive while it has no fresh picture
+        val reader = MjpegReader(ByteArrayInputStream(part(ByteArray(0)) + part(parts[0])))
+        assertArrayEquals(ByteArray(0), reader.next())
+        assertArrayEquals(parts[0], reader.next())
+    }
+
     @Test fun truncatedStreamEnds() {
         val whole = part(parts[2])
         val reader = MjpegReader(ByteArrayInputStream(whole.copyOf(whole.size / 2)))

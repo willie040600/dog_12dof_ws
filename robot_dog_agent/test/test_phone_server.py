@@ -213,6 +213,32 @@ def test_go_to_sets_the_target(served):
     assert body(call(server, '/api/state'))['target'] == [1.2, 0.5]
 
 
+class InstantRefusal(FakeSession):
+    """go_to's job ends before go_to returns, as a target check that refuses at once (a wall, off the map)."""
+
+    def go_to(self, x, y):
+        ok = self._start('go_to', x, y)
+        if ok:
+            self.finish()
+        return ok
+
+
+def test_a_refused_tap_target_goes_away(served):
+    clock = [100.0]
+    server, session, _ = served(session=InstantRefusal(), clock=lambda: clock[0])
+    assert body(call(server, '/api/go_to', {'x': 100.0, 'y': 0.0}))['ok'] is True
+    assert body(call(server, '/api/state'))['target'] == [100.0, 0.0]
+    clock[0] = 102.1
+    assert body(call(server, '/api/state'))['target'] is None
+
+
+def test_a_refused_go_to_sets_no_target(served):
+    server, session, _ = served()
+    session.state = 'busy'
+    call(server, '/api/go_to', {'x': 1.0, 'y': 1.0})
+    assert body(call(server, '/api/state'))['target'] is None
+
+
 def test_bad_json_is_400(served):
     server, session, _ = served()
     assert call(server, '/api/command', b'not json')[0] == 400
@@ -298,6 +324,41 @@ def test_client_hangs_up_mid_stream(served, capfd):
         feeds.frame = red_frame()
     assert call(server, '/api/ping', code=None)[0] == 200
     assert 'Traceback' not in capfd.readouterr().err
+
+
+def stream(server):
+    request = urllib.request.Request('http://127.0.0.1:%d/api/camera.mjpg' % server.port,
+                                     headers={'Authorization': 'Bearer ' + CODE})
+    return urllib.request.urlopen(request, timeout=5)
+
+
+def test_a_silent_camera_sends_empty_parts(served):
+    server, _, feeds = served()   # a camera, but no picture (yet, or the simulator is paused)
+    with stream(server) as r:
+        headers, data = read_part(r)
+        assert headers['content-type'] == 'image/jpeg' and data == b''
+
+
+def test_a_phone_that_hangs_up_on_a_silent_camera_frees_its_thread(served):
+    server, _, feeds = served()
+    before = threading.active_count()
+    for _ in range(3):
+        sock = socket.create_connection(('127.0.0.1', server.port), timeout=5)
+        sock.sendall(b'GET /api/camera.mjpg HTTP/1.1\r\nHost: x\r\nAuthorization: Bearer ' + CODE.encode() + b'\r\n\r\n')
+        received = b''
+        while b'\r\n\r\n' not in received:
+            received += sock.recv(65536)
+        sock.close()
+    assert wait_until(lambda: threading.active_count() <= before, 5.0), threading.active_count() - before
+
+
+def wait_until(cond, seconds):
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if cond():
+            return True
+        time.sleep(0.1)
+    return cond()
 
 
 def test_nothing_contains_the_key(served):

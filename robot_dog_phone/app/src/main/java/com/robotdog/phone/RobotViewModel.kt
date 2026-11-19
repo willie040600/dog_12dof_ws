@@ -174,7 +174,9 @@ class RobotViewModel(application: Application) : AndroidViewModel(application) {
                     reader.use {
                         while (isActive) {
                             val jpeg = it.next() ?: break
-                            frame = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)?.asImageBitmap() ?: continue
+                            // an empty part: the server has no fresh picture (camera stopped, simulator paused)
+                            frame = if (jpeg.isEmpty()) null
+                            else BitmapFactory.decodeByteArray(jpeg, 0, jpeg.size)?.asImageBitmap() ?: continue
                         }
                     }
                 }
