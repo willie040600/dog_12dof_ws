@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
@@ -44,10 +45,10 @@ const val NO_MAP = "等地圖…（nav.launch.py 開了嗎？）"
 @Composable
 fun MapCanvas(
     info: MapInfo?, image: ImageBitmap?, state: RobotState?, places: List<Place>, pending: Point?,
-    onTap: ((Point) -> Unit)?, modifier: Modifier = Modifier,
+    onTap: ((Point) -> Unit)?, modifier: Modifier = Modifier, labels: Boolean = true,
 ) {
     val measurer = rememberTextMeasurer()
-    Box(modifier.background(Color(0xFFE0E0E0))) {
+    Box(modifier.clipToBounds().background(Color(0xFFE0E0E0))) {
         if (info == null || image == null) {
             Text(NO_MAP, Modifier.align(Alignment.Center), color = Color(0xFF606060))
             return@Box
@@ -69,13 +70,13 @@ fun MapCanvas(
             for (p in places) {
                 val c = at(p.x, p.y)
                 drawCircle(PLACE, 3.5f * density / 2f + 2f, c)
-                drawText(measurer, p.short, c + Offset(5f, -14f * density), label.copy(color = PLACE))
+                if (labels) drawText(measurer, p.short, c + Offset(5f, -14f * density), label.copy(color = PLACE))
             }
             for (t in state?.objects.orEmpty()) {
                 val c = at(t.x, t.y)
                 val half = 4.5f * density / 1.5f
                 drawRect(THING, c - Offset(half, half), androidx.compose.ui.geometry.Size(2 * half, 2 * half))
-                drawText(measurer, t.name, c + Offset(6f, 2f), label.copy(color = THING))
+                if (labels) drawText(measurer, t.name, c + Offset(6f, 2f), label.copy(color = THING))
             }
             val path = state?.path.orEmpty()
             if (path.size >= 2) {

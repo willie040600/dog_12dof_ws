@@ -71,7 +71,7 @@ fun MainScreen(model: RobotViewModel) {
             val map = @Composable { modifier: Modifier, big: Boolean ->
                 MapCanvas(
                     model.mapInfo, model.mapImage, state, model.hello?.places.orEmpty(), model.pendingTarget,
-                    onTap = if (big) model::tapMap else null, modifier = modifier.testTag("map"),
+                    onTap = if (big) model::tapMap else null, modifier = modifier.testTag("map"), labels = big,
                 )
             }
             val camera = @Composable { modifier: Modifier ->

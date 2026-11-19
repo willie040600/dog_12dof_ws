@@ -106,6 +106,9 @@ cd ~/dog_12dof_ws && source install/setup.bash
 ros2 run robot_dog_agent gui
 ```
 
+也有 Android 手機版，在家裡的 Wi-Fi 上用手機做到視窗版能做的事（電腦端執行 `ros2 run robot_dog_agent phone`，和 `gui` 二選一）。
+app 見 [robot_dog_phone/README.md](robot_dog_phone/README.md)。
+
 申請 key、能說的話、地點表和限制見 [robot_dog_agent/README.md](robot_dog_agent/README.md)。
 
 ## 確認裝好了
@@ -150,6 +153,7 @@ cd ~/dog_12dof_ws/robot_dog_agent && python3 -m pytest test -q
 | `robot_dog_description/isaaclab/` | 用 Isaac Lab 訓練行走策略 | [README](robot_dog_description/isaaclab/README.md) |
 | `robot_dog_navigation/` | Nav2、SLAM / AMCL、地圖、評估腳本 | [README](robot_dog_navigation/README.md) |
 | `robot_dog_agent/` | 用中文下指令的 Gemini agent | [README](robot_dog_agent/README.md) |
+| `robot_dog_phone/` | Android 手機遙控 app（Kotlin + Jetpack Compose） | [README](robot_dog_phone/README.md) |
 | `docs/superpowers/` | 設計規格與實作計畫 | |
 
 ## 授權
