@@ -34,12 +34,13 @@ class EventLog:
             return self._last
 
     def after(self, n, timeout):
-        """(events newer than n, the number to ask after next), waiting up to timeout s for the first one."""
+        """(events newer than n, the number to ask after next), waiting up to timeout s for the first one.
+        An n beyond the last event (counted before the server restarted) is answered at once with the last number."""
         with self._changed:
-            self._changed.wait_for(lambda: self._closed or self._last > n, timeout)
+            self._changed.wait_for(lambda: self._closed or self._last != n, timeout)
             if self._closed:
                 return [], n
-            return [dict(e) for e in self._events if e['id'] > n], max(n, self._last)
+            return [dict(e) for e in self._events if e['id'] > n], self._last
 
     def close(self):
         """Wake every waiter; from now on after() returns at once."""

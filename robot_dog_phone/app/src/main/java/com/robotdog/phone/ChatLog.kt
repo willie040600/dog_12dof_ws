@@ -7,11 +7,16 @@ class ChatLog {
 
     val lines: List<String> get() = shown.toList()
 
-    /** Adds the events and returns the number to ask after next. */
-    fun apply(events: Events): Int {
+    /**
+     * Adds the events of a request for those after askedAfter, and returns the number to ask after next. A new boot
+     * of the server numbers its events from 1 again: an answer to an old number is dropped, and 0 is returned so the
+     * next request starts from the beginning.
+     */
+    fun apply(events: Events, askedAfter: Int = 0): Int {
         if (events.boot != boot) {
             boot = events.boot
             shown.clear()
+            if (askedAfter != 0) return 0
         }
         for (e in events.events) {
             if (e.kind != "state") shown += prefix(e.kind) + e.text

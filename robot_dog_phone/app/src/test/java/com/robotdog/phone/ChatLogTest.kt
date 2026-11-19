@@ -28,8 +28,11 @@ class ChatLogTest {
     @Test fun bootChangeClearsTheLog() {
         val log = ChatLog()
         log.apply(events("a", 1 to ("log" to "1"), 2 to ("log" to "2"), 3 to ("log" to "3")))
-        assertEquals(2, log.apply(events("b", 1 to ("log" to "new 1"), 2 to ("log" to "new 2"))))
-        assertEquals(listOf("new 1", "new 2"), log.lines)
+        // the restarted server answered "after 3" with its own numbers: drop it, ask again from the start
+        assertEquals(0, log.apply(events("b", 3 to ("log" to "new 3")), askedAfter = 3))
+        assertEquals(emptyList<String>(), log.lines)
+        assertEquals(3, log.apply(events("b", 1 to ("log" to "new 1"), 2 to ("log" to "new 2"), 3 to ("log" to "new 3"))))
+        assertEquals(listOf("new 1", "new 2", "new 3"), log.lines)
     }
 
     @Test fun emptyAnswerKeepsTheNumber() {

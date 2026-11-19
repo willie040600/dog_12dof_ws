@@ -58,6 +58,14 @@ def test_event_log_keeps_the_newest_300():
     assert len(events) == 300 and events[0]['id'] == 6 and nxt == 305
 
 
+def test_event_log_number_from_another_boot_returns_at_once():
+    log = EventLog()
+    log.add('log', 'a')
+    start = time.monotonic()
+    assert log.after(57, 5) == ([], 1)  # a phone still counting from before a restart: no waiting
+    assert time.monotonic() - start < 0.5
+
+
 def test_event_log_close_wakes_waiters():
     log, out = EventLog(), {}
 
