@@ -1,0 +1,36 @@
+{
+  "boot": "0a1b2c3d",
+  "events": [
+    {
+      "id": 1,
+      "kind": "log",
+      "text": "可以開始了：打字、或按下面的地點按鈕。"
+    },
+    {
+      "id": 2,
+      "kind": "state",
+      "text": "busy"
+    },
+    {
+      "id": 3,
+      "kind": "log",
+      "text": "  [工具] go_to_pose {\"x\": 1.2, \"y\": 0.5} → reached"
+    },
+    {
+      "id": 4,
+      "kind": "user",
+      "text": "去廚房"
+    },
+    {
+      "id": 5,
+      "kind": "reply",
+      "text": "到廚房了。"
+    },
+    {
+      "id": 6,
+      "kind": "error",
+      "text": "Gemini 沒有回應"
+    }
+  ],
+  "next": 6
+}

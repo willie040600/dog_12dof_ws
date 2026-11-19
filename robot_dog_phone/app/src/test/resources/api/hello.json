@@ -1,0 +1,63 @@
+{
+  "boot": "0a1b2c3d",
+  "places": [
+    {
+      "id": "start",
+      "name": "起點（客廳中央，沙發和電視櫃之間）",
+      "short": "起點",
+      "x": 0.0,
+      "y": 0.0
+    },
+    {
+      "id": "living_room",
+      "name": "客廳西側",
+      "short": "客廳西側",
+      "x": -2.5,
+      "y": -0.3
+    },
+    {
+      "id": "master_bedroom",
+      "name": "主臥室",
+      "short": "主臥室",
+      "x": -1.5,
+      "y": 3.0
+    },
+    {
+      "id": "second_bedroom",
+      "name": "次臥室",
+      "short": "次臥室",
+      "x": 3.0,
+      "y": 2.2
+    },
+    {
+      "id": "dining_table",
+      "name": "餐桌旁（餐桌東側，面向餐桌）",
+      "short": "餐桌旁",
+      "x": 3.6,
+      "y": 0.3
+    },
+    {
+      "id": "kitchen",
+      "name": "廚房（流理台前，面向流理台）",
+      "short": "廚房",
+      "x": 2.5,
+      "y": -0.6
+    },
+    {
+      "id": "entrance",
+      "name": "玄關（面向大門）",
+      "short": "玄關",
+      "x": -2.0,
+      "y": -0.9
+    },
+    {
+      "id": "bathroom_door",
+      "name": "浴室門口（門外，面向浴室）",
+      "short": "浴室門口",
+      "x": 3.6,
+      "y": -0.5
+    }
+  ],
+  "can_survey": true,
+  "camera": true
+}
