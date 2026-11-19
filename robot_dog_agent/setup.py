@@ -20,6 +20,7 @@ setup(
         'console_scripts': [
             'chat = robot_dog_agent.chat:main',
             'gui = robot_dog_agent.gui:main',
+            'phone = robot_dog_agent.phone:main',
             'agent_eval = robot_dog_agent.agent_eval:main',
         ],
     },
